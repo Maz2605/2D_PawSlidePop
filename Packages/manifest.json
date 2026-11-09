@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "com.benoitfreslon.vibration": "https://github.com/BenoitFreslon/Vibration.git",
     "com.coffee.ui-particle": "https://github.com/mob-sakai/ParticleEffectForUGUI.git",
     "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main",
     "com.unity.2d.animation": "13.0.4",
