@@ -2,9 +2,10 @@ using System.Collections.Generic;
 using _PawSlidePopGame._Scripts.Core.System.GameFlow;
 using _PawSlidePopGame._Scripts.Data.LevelProvider;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.MapManager;
-using _PawSlidePopGame._Scripts.UI.Base;
+using MazFramework.UI;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Events;
 
 namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
 {
@@ -30,6 +31,7 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
         [SerializeField, Range(0f, 1f)] private float targetViewportRatio = 0.4f;
 
         private readonly List<(Button button, string levelId)> _levelButtons = new List<(Button, string)>();
+        private readonly Dictionary<Button, UnityAction> _levelHandlers = new Dictionary<Button, UnityAction>();
         private readonly ResourcesLevelCatalogProvider _catalogProvider = new ResourcesLevelCatalogProvider();
         private readonly MapManager _mapManager = new MapManager();
         private readonly List<MapSectionView> _sectionInstances = new List<MapSectionView>();
@@ -102,6 +104,8 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
 
         private void DiscoverAndBindLevelButtons()
         {
+            foreach (var pair in _levelHandlers) if (pair.Key != null) pair.Key.onClick.RemoveListener(pair.Value);
+            _levelHandlers.Clear();
             _levelButtons.Clear();
 
             // Find all buttons in children
@@ -117,7 +121,9 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
                     if (!string.IsNullOrEmpty(levelId))
                     {
                         _levelButtons.Add((btn, levelId));
-                        BindButton(btn, () => HandleLevelPressed(levelId));
+                        UnityAction handler = () => HandleLevelPressed(levelId);
+                        _levelHandlers[btn] = handler;
+                        btn.onClick.AddListener(handler);
                         Debug.Log($"[MapSubScreen] Successfully bound level button '{btn.name}' to level '{levelId}'", btn);
                     }
                 }
@@ -127,7 +133,9 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
             if (_levelButtons.Count == 0 && btnLevel != null)
             {
                 string fallbackLevelId = string.IsNullOrWhiteSpace(tempLevelId) ? "Level_001" : tempLevelId;
-                BindButton(btnLevel, () => HandleLevelPressed(fallbackLevelId));
+                UnityAction handler = () => HandleLevelPressed(fallbackLevelId);
+                _levelHandlers[btnLevel] = handler;
+                btnLevel.onClick.AddListener(handler);
                 Debug.Log($"[MapSubScreen] Fallback bound single button '{btnLevel.name}' to level '{fallbackLevelId}'", btnLevel);
             }
         }
@@ -750,11 +758,13 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
 
         private void OnEnable()
         {
+            foreach (var pair in _levelHandlers) if (pair.Key != null) { pair.Key.onClick.RemoveListener(pair.Value); pair.Key.onClick.AddListener(pair.Value); }
             LevelProgressRepository.OnDataChanged += HandleLevelProgressChanged;
         }
 
         private void OnDisable()
         {
+            foreach (var pair in _levelHandlers) if (pair.Key != null) pair.Key.onClick.RemoveListener(pair.Value);
             LevelProgressRepository.OnDataChanged -= HandleLevelProgressChanged;
         }
 

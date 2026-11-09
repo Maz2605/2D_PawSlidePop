@@ -117,7 +117,7 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
             // 4. Cấu hình nút nhận, màu chữ và thay đổi hình dạng nút bấm theo trạng thái
             if (getButton != null && buttonText != null)
             {
-                getButton.onClick.RemoveAllListeners();
+                getButton.onClick.RemoveListener(OnGetButtonClicked);
                 var btnImage = getButton.GetComponent<Image>();
 
                 if (isClaimed)
@@ -172,6 +172,14 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
         private void OnGetButtonClicked()
         {
             _onClaimClicked?.Invoke(_reward);
+        }
+        private void OnDisable()
+        {
+            if (getButton != null) getButton.onClick.RemoveListener(OnGetButtonClicked);
+        }
+        private void OnEnable()
+        {
+            if (getButton != null) { getButton.onClick.RemoveListener(OnGetButtonClicked); getButton.onClick.AddListener(OnGetButtonClicked); }
         }
     }
 }

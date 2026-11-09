@@ -1,5 +1,5 @@
 using System;
-using _PawSlidePopGame._Scripts.UI.Base;
+using MazFramework.UI;
 using _PawSlidePopGame._Scripts.Feature.Match3.Data;
 using DG.Tweening;
 using TMPro;
@@ -107,7 +107,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             BindButtons();
         }
 
-        protected override void PlayShowAnimation()
+        protected override Tween CreateShowTween(CanvasGroup group, float duration)
         {
             _showSequence = DOTween.Sequence()
                 .SetUpdate(true)
@@ -122,14 +122,16 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                 );
             }
 
-            _showSequence.OnComplete(() =>
+            _showSequence.AppendCallback(() =>
             {
                 SetButtonsInteractable(true);
                 StartIdleAnimations();
             });
+            _showSequence.Insert(0f, group.DOFade(1f, ShowDuration));
+            return _showSequence;
         }
 
-        protected override void PlayHideAnimation(Action onComplete)
+        protected override Tween CreateHideTween(CanvasGroup group, float duration)
         {
             KillActiveTweens();
 
@@ -145,8 +147,9 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                 );
             }
 
-            hideSequence.Join(canvasGroup.DOFade(0f, hideScaleDuration).SetEase(hideEase));
-            hideSequence.OnComplete(() => onComplete?.Invoke());
+            hideSequence.Join(CanvasGroup.DOFade(0f, hideScaleDuration).SetEase(hideEase));
+            
+            return hideSequence;
         }
 
         private void StartIdleAnimations()
@@ -220,21 +223,12 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
         {
             SetButtonsInteractable(false);
 
-            BindButton(okButton, HandleClosePressed);
-            BindButton(closeButton, HandleClosePressed);
-            BindButtonWithoutPressFx(backgroundButton, HandleClosePressed);
+            if (okButton != null) { okButton.onClick.RemoveListener(HandleClosePressed); okButton.onClick.AddListener(HandleClosePressed); }
+            if (closeButton != null) { closeButton.onClick.RemoveListener(HandleClosePressed); closeButton.onClick.AddListener(HandleClosePressed); }
+            if (backgroundButton != null) { backgroundButton.onClick.RemoveListener(HandleClosePressed); backgroundButton.onClick.AddListener(HandleClosePressed); }
         }
 
-        private void BindButtonWithoutPressFx(Button btn, Action onClickAction)
-        {
-            if (btn == null)
-            {
-                return;
-            }
 
-            btn.onClick?.RemoveAllListeners();
-            btn.onClick?.AddListener(() => onClickAction?.Invoke());
-        }
 
         private void HandleClosePressed()
         {
@@ -248,9 +242,17 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             if (backgroundButton != null) backgroundButton.interactable = interactable;
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             KillActiveTweens();
+        }
+        protected override void OnDisable()
+        {
+            if (backgroundButton != null) backgroundButton.onClick.RemoveListener(HandleClosePressed);
+            if (okButton != null) okButton.onClick.RemoveListener(HandleClosePressed);
+            if (closeButton != null) closeButton.onClick.RemoveListener(HandleClosePressed);
+            base.OnDisable();
         }
     }
 }

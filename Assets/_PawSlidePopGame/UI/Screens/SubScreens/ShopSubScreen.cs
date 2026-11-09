@@ -1,10 +1,10 @@
+using MazFramework.Audio;
+using MazFramework.Haptics;
+using PawAudioConfig = _PawSlidePopGame._Scripts.Data.Config.PawSlidePopAudioConfig;
 using System.Collections.Generic;
-using _PawSlidePopGame._Scripts.Core.Audio;
-using _PawSlidePopGame._Scripts.Core.Vibration;
 using _PawSlidePopGame._Scripts.Feature.Meta.Shop;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.EconomyManager;
-using _PawSlidePopGame._Scripts.UI.Base;
-using _PawSlidePopGame._Scripts.UI.Manager;
+using MazFramework.UI;
 using UnityEngine;
 
 namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
@@ -184,13 +184,12 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
 
         private void HandlePurchaseSuccess(ShopItemSO item)
         {
-            if (AudioController.Instance != null)
+            var audio = AudioManager.Instance;
+            if (audio?.Config is PawAudioConfig config)
+                audio.PlaySfx(config.UiSfx.purchaseSuccess);
+            if (MazFramework.Haptics.HapticManager.Instance != null)
             {
-                AudioController.Instance.PlayUISound(UISoundType.PurchaseSuccess);
-            }
-            if (VibrationManager.Instance != null)
-            {
-                VibrationManager.Instance.PlayMediumImpact();
+                MazFramework.Haptics.HapticManager.Instance.PlayMediumImpact();
             }
 
             UIManager.Instance?.ShowToast($"Successfully purchased: {item.DisplayName}!");
@@ -199,13 +198,12 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
 
         private void HandlePurchaseFailed(ShopItemSO item, PurchaseFailReason reason)
         {
-            if (AudioController.Instance != null)
+            var audio = AudioManager.Instance;
+            if (audio?.Config is PawAudioConfig config)
+                audio.PlaySfx(config.UiSfx.toastError);
+            if (MazFramework.Haptics.HapticManager.Instance != null)
             {
-                AudioController.Instance.PlayUISound(UISoundType.ToastError);
-            }
-            if (VibrationManager.Instance != null)
-            {
-                VibrationManager.Instance.PlayReject();
+                MazFramework.Haptics.HapticManager.Instance.PlayWarning();
             }
 
             string message = reason switch

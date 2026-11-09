@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 // Attribute này cho phép script chạy cả trong Edit Mode lẫn Play Mode
 [ExecuteAlways] 

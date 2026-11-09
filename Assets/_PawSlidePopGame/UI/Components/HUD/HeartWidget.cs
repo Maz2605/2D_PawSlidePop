@@ -2,7 +2,7 @@ using System;
 using DG.Tweening;
 using TMPro;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.EconomyManager;
-using _PawSlidePopGame._Scripts.UI.Manager;
+using MazFramework.UI;
 using _PawSlidePopGame._Scripts.UI.Popups;
 using UnityEngine;
 using UnityEngine.UI;
@@ -143,7 +143,7 @@ namespace _PawSlidePopGame._Scripts.UI.Components.HUD
 
         private void OnDisable()
         {
-            HeartManager manager = GetHeartManager();
+            HeartManager manager = HeartManager.ExistingInstance;
             if (manager != null)
             {
                 manager.OnHeartsChanged -= HandleHeartsChanged;
@@ -454,7 +454,7 @@ namespace _PawSlidePopGame._Scripts.UI.Components.HUD
             Image activeIcon = ActiveHeartIcon;
             if (activeIcon == null || iconIdleAnimType == IconIdleAnimType.None) return;
 
-            _idleTween?.Kill();
+            if (DOTween.instance != null) _idleTween?.Kill();
             IconState baseState = GetIconBaseState(activeIcon);
 
             if (iconIdleAnimType == IconIdleAnimType.Floating)
@@ -541,13 +541,13 @@ namespace _PawSlidePopGame._Scripts.UI.Components.HUD
 
         private void KillAllTweens()
         {
-            _animationSequence?.Kill();
+            if (DOTween.instance != null) _animationSequence?.Kill();
             _animationSequence = null;
-            _shakeSequence?.Kill();
+            if (DOTween.instance != null) _shakeSequence?.Kill();
             _shakeSequence = null;
-            _transitionSequence?.Kill();
+            if (DOTween.instance != null) _transitionSequence?.Kill();
             _transitionSequence = null;
-            _idleTween?.Kill();
+            if (DOTween.instance != null) _idleTween?.Kill();
             _idleTween = null;
         }
 

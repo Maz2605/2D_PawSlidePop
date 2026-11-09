@@ -18,13 +18,22 @@ namespace _PawSlidePopGame._Scripts.UI.Components
         public void Init(Action onClickAction)
         {
             _onClickAction = onClickAction;
-            _button.onClick.RemoveAllListeners();
+            _button.onClick.RemoveListener(HandleClicked);
             _button.onClick.AddListener(HandleClicked);
         }
 
         private void HandleClicked()
         {
             _onClickAction?.Invoke();
+        }
+        private void OnDisable()
+        {
+            if (_button != null) _button.onClick.RemoveListener(HandleClicked);
+        }
+        private void OnEnable()
+        {
+            if (_button == null) _button = GetComponent<Button>();
+            if (_button != null) { _button.onClick.RemoveListener(HandleClicked); _button.onClick.AddListener(HandleClicked); }
         }
     }
 }

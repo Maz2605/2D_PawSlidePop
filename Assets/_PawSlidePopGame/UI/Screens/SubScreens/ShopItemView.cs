@@ -100,7 +100,7 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
             // Gán sự kiện nút Mua
             if (purchaseButton != null)
             {
-                purchaseButton.onClick.RemoveAllListeners();
+                purchaseButton.onClick.RemoveListener(OnPurchaseButtonClicked);
                 purchaseButton.onClick.AddListener(OnPurchaseButtonClicked);
             }
         }
@@ -129,6 +129,14 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
         private void OnPurchaseButtonClicked()
         {
             _onPurchaseClicked?.Invoke(_item);
+        }
+        private void OnDisable()
+        {
+            if (purchaseButton != null) purchaseButton.onClick.RemoveListener(OnPurchaseButtonClicked);
+        }
+        private void OnEnable()
+        {
+            if (purchaseButton != null) { purchaseButton.onClick.RemoveListener(OnPurchaseButtonClicked); purchaseButton.onClick.AddListener(OnPurchaseButtonClicked); }
         }
     }
 }

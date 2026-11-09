@@ -62,6 +62,9 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
         private Vector2 _bubbleBaseAnchoredPosition;
         private Quaternion _lockBaseRotation;
 
+        private Action<string> _onPressed;
+        private string _levelId;
+        private void HandlePressed() => _onPressed?.Invoke(_levelId);
         public Button Button => button;
 
         private void Awake()
@@ -71,6 +74,7 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
 
         private void OnDisable()
         {
+            if (button != null) button.onClick.RemoveListener(HandlePressed);
             StopLockedVisuals(resetPose: true);
         }
 
@@ -96,11 +100,12 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
                 return;
             }
 
-            button.onClick.RemoveAllListeners();
+            button.onClick.RemoveListener(HandlePressed);
             // Nút luôn có thể tương tác (interactable = true) để người chơi có thể click vào màn bị khóa và mở LevelLockedPopup
             button.interactable = true;
-            string capturedLevelId = entry.LevelId;
-            button.onClick.AddListener(() => onPressed?.Invoke(capturedLevelId));
+            _levelId = entry.LevelId;
+            _onPressed = onPressed;
+            button.onClick.AddListener(HandlePressed);
         }
 
         private void ApplyState(MapLevelEntry entry)
@@ -326,6 +331,10 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
             {
                 target.gameObject.SetActive(active);
             }
+        }
+        private void OnEnable()
+        {
+            if (button != null) { button.onClick.RemoveListener(HandlePressed); button.onClick.AddListener(HandlePressed); }
         }
     }
 }

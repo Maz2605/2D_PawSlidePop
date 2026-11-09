@@ -3,6 +3,7 @@ using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Events;
 
 namespace _PawSlidePopGame._Scripts.UI.Components.NavigationBar
 {
@@ -18,6 +19,7 @@ namespace _PawSlidePopGame._Scripts.UI.Components.NavigationBar
 
         [NonSerialized] public Vector2 defaultIconAnchoredPos;
         [NonSerialized] public Sequence animSeq;
+        [NonSerialized] public UnityAction clickHandler;
     }
 
     [RequireComponent(typeof(RectTransform))]
@@ -61,8 +63,9 @@ namespace _PawSlidePopGame._Scripts.UI.Components.NavigationBar
                 if (tab.button != null)
                 {
                     MainTabID id = tab.tabID;
-                    tab.button.onClick.RemoveAllListeners();
-                    tab.button.onClick.AddListener(() => ChangeTab(id));
+                    if (tab.clickHandler != null) tab.button.onClick.RemoveListener(tab.clickHandler);
+                    tab.clickHandler = () => ChangeTab(id);
+                    tab.button.onClick.AddListener(tab.clickHandler);
                 }
             }
 
@@ -156,6 +159,16 @@ namespace _PawSlidePopGame._Scripts.UI.Components.NavigationBar
                     tab?.animSeq?.Kill();
                 }
             }
+        }
+        private void OnEnable()
+        {
+            if (tabs == null) return;
+            foreach (var tab in tabs) if (tab?.button != null && tab.clickHandler != null) { tab.button.onClick.RemoveListener(tab.clickHandler); tab.button.onClick.AddListener(tab.clickHandler); }
+        }
+        private void OnDisable()
+        {
+            if (tabs == null) return;
+            foreach (var tab in tabs) { if (tab?.button != null && tab.clickHandler != null) tab.button.onClick.RemoveListener(tab.clickHandler); if (DOTween.instance != null) tab?.animSeq?.Kill(); }
         }
     }
 }

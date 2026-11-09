@@ -1,8 +1,6 @@
 using System;
-using System.Reflection;
 using _PawSlidePopGame._Scripts.Core.System.GameFlow;
-using _PawSlidePopGame._Scripts.UI.Base;
-using _PawSlidePopGame._Scripts.UI.Manager;
+using MazFramework.UI;
 using _PawSlidePopGame._Scripts.UI.Popups;
 using DG.Tweening;
 using UnityEngine;
@@ -26,37 +24,7 @@ namespace _PawSlidePopGame._Scripts.UI.Screens
         [SerializeField] private CanvasGroup topRightButtonsCG;
 
         private Tween _pulseTween;
-
-        protected override void Awake()
-        {
-            base.Awake();
-            RegisterSelfToUIManager();
-        }
-
-        private void RegisterSelfToUIManager()
-        {
-            try
-            {
-                var uiManager = UIManager.Instance;
-                if (uiManager != null)
-                {
-                    // Register ourselves in _screenCache using Reflection
-                    var cacheField = typeof(UIManager).GetField("_screenCache", BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (cacheField != null)
-                    {
-                        var cache = (System.Collections.Generic.Dictionary<Type, BaseScreen>)cacheField.GetValue(uiManager);
-                        if (cache != null)
-                        {
-                            cache[typeof(StartScreen)] = this;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[StartScreen] Failed to dynamically register with UIManager: {ex.Message}");
-            }
-        }
+        private Sequence _entranceSequence;
 
         protected override void OnBeforeShow()
         {
@@ -70,24 +38,26 @@ namespace _PawSlidePopGame._Scripts.UI.Screens
             if (topLeftButtonsCG != null) topLeftButtonsCG.alpha = 0f;
             if (topRightButtonsCG != null) topRightButtonsCG.alpha = 0f;
 
+            _entranceSequence?.Kill();
             _pulseTween?.Kill();
 
             // Bind buttons
             if (playButton != null)
             {
-                BindButton(playButton, OnPlayButtonClicked);
+                if (playButton != null) { playButton.onClick.RemoveListener(OnPlayButtonClicked); playButton.onClick.AddListener(OnPlayButtonClicked); }
             }
 
             if (settingsButton != null)
             {
-                BindButton(settingsButton, OnSettingsButtonClicked);
+                if (settingsButton != null) { settingsButton.onClick.RemoveListener(OnSettingsButtonClicked); settingsButton.onClick.AddListener(OnSettingsButtonClicked); }
             }
         }
 
-        protected override void OnAfterShow()
+        protected override void OnShown()
         {
             // Sequence of animations
-            Sequence seq = DOTween.Sequence().SetUpdate(true);
+            _entranceSequence?.Kill();
+            Sequence seq = _entranceSequence = DOTween.Sequence().SetUpdate(true).SetLink(gameObject, LinkBehaviour.KillOnDisable);
 
             if (headlineRect != null)
             {
@@ -138,6 +108,7 @@ namespace _PawSlidePopGame._Scripts.UI.Screens
 
         private void OnPlayButtonClicked()
         {
+            _entranceSequence?.Kill();
             _pulseTween?.Kill();
             GameAppFlowManager.Instance.EnterMainMenu();
         }
@@ -149,7 +120,15 @@ namespace _PawSlidePopGame._Scripts.UI.Screens
 
         protected override void OnBeforeHide()
         {
+            _entranceSequence?.Kill();
             _pulseTween?.Kill();
+        }
+        protected override void OnDisable()
+        {
+            if (DOTween.instance != null) { _entranceSequence?.Kill(); _pulseTween?.Kill(); }
+            if (playButton != null) playButton.onClick.RemoveListener(OnPlayButtonClicked);
+            if (settingsButton != null) settingsButton.onClick.RemoveListener(OnSettingsButtonClicked);
+            base.OnDisable();
         }
     }
 }

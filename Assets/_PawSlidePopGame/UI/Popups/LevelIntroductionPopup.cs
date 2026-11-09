@@ -6,14 +6,13 @@ using _PawSlidePopGame._Scripts.Feature.Match3.Data;
 using _PawSlidePopGame._Scripts.Feature.Match3.Flow;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.Inventory;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.EconomyManager;
-using _PawSlidePopGame._Scripts.UI.Base;
+using MazFramework.UI;
 using _PawSlidePopGame._Scripts.UI.Components.HUD;
-using _PawSlidePopGame._Scripts.UI.Manager;
 using _PawSlidePopGame._Scripts.Data.Events;
 using _PawSlidePopGame._Scripts.Data.Events.Payloads;
 using _PawSlidePopGame._Scripts.Services.Ads;
 using _PawSlidePopGame._Scripts.Services.Analytics;
-using _PawSlidePopGame.Scripts.DesignPattern.ObserverPattern;
+using MazFramework.Foundation.Events;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -118,8 +117,12 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                 HandleRewardedAdFailed);
         }
 
-        private void OnDisable()
+        protected override void OnDisable()
         {
+            if (btnPlay != null) btnPlay.onClick.RemoveListener(HandlePlayPressed);
+            if (btnClose != null) btnClose.onClick.RemoveListener(HandleClosePressed);
+            if (btnBackground != null) btnBackground.onClick.RemoveListener(HandleClosePressed);
+            base.OnDisable();
             EventManager<AdsGameEvent>.RemoveListener<RewardedAdCompletedPayload>(
                 AdsGameEvent.RewardedAdCompleted,
                 HandleRewardedAdCompleted);
@@ -153,61 +156,33 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             RefreshBoosterCheckboxes();
         }
 
-        protected override void PlayShowAnimation()
+        protected override Tween CreateShowTween(CanvasGroup group, float duration)
         {
+            Sequence sequence = DOTween.Sequence();
             if (animatedContent != null)
             {
-                // Main popup body scales and pops in
                 animatedContent.localScale = Vector3.zero;
-                animatedContent.DOScale(Vector3.one, moveDuration)
-                    .SetEase(showEase)
-                    .SetUpdate(true)
-                    .SetLink(gameObject, LinkBehaviour.KillOnDisable)
-                    .OnComplete(() =>
-                    {
-                        SetupButtonsInteractable(true);
-                        StartIdleAnimations();
-                    });
-
-                // Also fade in background / content position slightly
                 animatedContent.anchoredPosition = _contentOriginalAnchoredPosition - new Vector2(0f, 50f);
-                animatedContent.DOAnchorPos(_contentOriginalAnchoredPosition, moveDuration)
-                    .SetEase(Ease.OutCubic)
-                    .SetUpdate(true)
-                    .SetLink(gameObject, LinkBehaviour.KillOnDisable);
+                sequence.Join(animatedContent.DOScale(Vector3.one, moveDuration).SetEase(showEase));
+                sequence.Join(animatedContent.DOAnchorPos(_contentOriginalAnchoredPosition, moveDuration).SetEase(Ease.OutCubic));
             }
-            else
-            {
-                SetupButtonsInteractable(true);
-                StartIdleAnimations();
-            }
-
-            // Trigger Staggered entry animation for child elements (Casual game style)
+            sequence.Insert(0f, group.DOFade(1f, ShowDuration));
+            sequence.AppendCallback(() => { SetupButtonsInteractable(true); StartIdleAnimations(); });
             PlayStaggeredEntryAnimations();
+            return sequence;
         }
 
-        protected override void PlayHideAnimation(Action onComplete)
+        protected override Tween CreateHideTween(CanvasGroup group, float duration)
         {
             KillActiveTweens();
-
+            Sequence sequence = DOTween.Sequence();
             if (animatedContent != null)
             {
-                // Scale down and fade out popup body
-                animatedContent.DOScale(Vector3.zero, moveDuration * 0.75f)
-                    .SetEase(hideEase)
-                    .SetUpdate(true)
-                    .SetLink(gameObject, LinkBehaviour.KillOnDisable);
-
-                animatedContent.DOAnchorPos(_contentOriginalAnchoredPosition - new Vector2(0f, moveOffsetY), moveDuration * 0.75f)
-                    .SetEase(Ease.InCubic)
-                    .SetUpdate(true)
-                    .SetLink(gameObject, LinkBehaviour.KillOnDisable)
-                    .OnComplete(() => onComplete?.Invoke());
+                sequence.Join(animatedContent.DOScale(Vector3.zero, moveDuration * 0.75f).SetEase(hideEase));
+                sequence.Join(animatedContent.DOAnchorPos(_contentOriginalAnchoredPosition - new Vector2(0f, moveOffsetY), moveDuration * 0.75f).SetEase(Ease.InCubic));
             }
-            else
-            {
-                onComplete?.Invoke();
-            }
+            sequence.Join(group.DOFade(0f, moveDuration * 0.75f));
+            return sequence;
         }
 
         private void PopulateTargets()
@@ -255,9 +230,10 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                             btn = view.root.transform.parent.gameObject.AddComponent<Button>();
                             btn.transition = Selectable.Transition.None;
                         }
-                        btn.onClick.RemoveAllListeners();
+                        
                         Transform targetTransform = view.root.transform.parent;
-                        btn.onClick.AddListener(() => PlayTargetClickAnimation(targetTransform));
+                        var feedback = btn.GetComponent<UIButtonVisual>() ?? btn.gameObject.AddComponent<UIButtonVisual>();
+                        feedback.Configure(targetTransform, null, false);
                     }
                     else
                     {
@@ -539,9 +515,9 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
         private void BindButtons()
         {
             SetupButtonsInteractable(false);
-            BindButton(btnPlay, HandlePlayPressed);
-            BindButton(btnClose, HandleClosePressed);
-            BindButton(btnBackground, HandleClosePressed);
+            if (btnPlay != null) { btnPlay.onClick.RemoveListener(HandlePlayPressed); btnPlay.onClick.AddListener(HandlePlayPressed); }
+            if (btnClose != null) { btnClose.onClick.RemoveListener(HandleClosePressed); btnClose.onClick.AddListener(HandleClosePressed); }
+            if (btnBackground != null) { btnBackground.onClick.RemoveListener(HandleClosePressed); btnBackground.onClick.AddListener(HandleClosePressed); }
         }
 
         private void HandlePlayPressed()
@@ -834,22 +810,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             transform.DOKill();
         }
 
-        private void PlayTargetClickAnimation(Transform targetTransform)
-        {
-            if (targetTransform == null) return;
 
-            targetTransform.DOKill(true);
-
-            targetTransform.DOScale(new Vector3(1.15f, 0.85f, 1f), 0.12f)
-                .SetEase(Ease.OutQuad)
-                .SetUpdate(true)
-                .OnComplete(() =>
-                {
-                    targetTransform.DOScale(Vector3.one, 0.25f)
-                        .SetEase(Ease.OutElastic)
-                        .SetUpdate(true);
-                });
-        }
 
         private void HandleRewardedAdCompleted(RewardedAdCompletedPayload payload)
         {
@@ -887,8 +848,9 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             _pendingAdBooster = null;
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             KillActiveTweens();
 
             if (boosterWidget != null)

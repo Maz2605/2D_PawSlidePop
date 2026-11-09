@@ -3,7 +3,7 @@ using _PawSlidePopGame._Scripts.Data.Events;
 using _PawSlidePopGame._Scripts.Data.Events.Payloads;
 using _PawSlidePopGame._Scripts.Feature.Match3.Flow;
 using _PawSlidePopGame._Scripts.Feature.Match3.Presenter;
-using _PawSlidePopGame.Scripts.DesignPattern.ObserverPattern;
+using MazFramework.Foundation.Events;
 using DG.Tweening;
 using UnityEngine;
 

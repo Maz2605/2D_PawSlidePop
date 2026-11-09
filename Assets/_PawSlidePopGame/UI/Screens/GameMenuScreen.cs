@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using _PawSlidePopGame._Scripts.UI.Base;
+using MazFramework.UI;
 using _PawSlidePopGame._Scripts.UI.Components.NavigationBar;
 using UnityEngine;
 
@@ -15,6 +15,10 @@ namespace _PawSlidePopGame._Scripts.UI.Screens
 
     public class GameMenuScreen : BaseScreen
     {
+        [SerializeField] private UnityEngine.UI.Button settingsButton;
+        [SerializeField] private UnityEngine.UI.Button profileButton;
+        private void HandleSettingsClicked() => UIManager.Instance.ShowPopup<_PawSlidePopGame._Scripts.UI.Popups.SettingsPopup>();
+        private void HandleProfileClicked() => UIManager.Instance.ShowPopup<_PawSlidePopGame._Scripts.UI.Popups.ProfilePopup>();
         [Header("--- Tab Navigation ---")]
         [SerializeField] private NavigationBar navigationBar;
         [SerializeField] private MainTabID defaultTab = MainTabID.MapTab;
@@ -33,7 +37,10 @@ namespace _PawSlidePopGame._Scripts.UI.Screens
 
         protected override void OnBeforeShow()
         {
+            if(settingsButton!=null) { settingsButton.onClick.RemoveListener(HandleSettingsClicked); settingsButton.onClick.AddListener(HandleSettingsClicked); }
+            if(profileButton!=null) { profileButton.onClick.RemoveListener(HandleProfileClicked); profileButton.onClick.AddListener(HandleProfileClicked); }
             EnsureInitialized();
+            if (navigationBar != null) { navigationBar.OnTabClicked -= HandleTabChanged; navigationBar.OnTabClicked += HandleTabChanged; }
             HideAllSubScreens();
             _currentTab = (MainTabID)(-1);
             _currentSubScreen = null;
@@ -48,8 +55,9 @@ namespace _PawSlidePopGame._Scripts.UI.Screens
             HandleTabChanged(defaultTab);
         }
 
-        private void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             if (navigationBar != null)
             {
                 navigationBar.OnTabClicked -= HandleTabChanged;
@@ -172,6 +180,13 @@ namespace _PawSlidePopGame._Scripts.UI.Screens
             {
                 Debug.LogError($"[GameMenuScreen] Default tab '{defaultTab}' has no subScreen binding on '{name}'.", this);
             }
+        }
+        protected override void OnDisable()
+        {
+            if (navigationBar != null) navigationBar.OnTabClicked -= HandleTabChanged;
+            if(settingsButton!=null) settingsButton.onClick.RemoveListener(HandleSettingsClicked);
+            if(profileButton!=null) profileButton.onClick.RemoveListener(HandleProfileClicked);
+            base.OnDisable();
         }
     }
 }

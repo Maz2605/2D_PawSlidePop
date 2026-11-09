@@ -2,8 +2,7 @@ using System.Collections.Generic;
 using _PawSlidePopGame._Scripts.Feature.Meta.Reward;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.EconomyManager;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.MapManager;
-using _PawSlidePopGame._Scripts.UI.Base;
-using _PawSlidePopGame._Scripts.UI.Manager;
+using MazFramework.UI;
 using TMPro;
 using UnityEngine;
 

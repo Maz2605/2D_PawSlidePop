@@ -4,7 +4,7 @@ using _PawSlidePopGame._Scripts.Data.Events;
 using _PawSlidePopGame._Scripts.Data.Events.Payloads;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.EconomyManager;
 using _PawSlidePopGame._Scripts.Services.Ads;
-using _PawSlidePopGame.Scripts.DesignPattern.ObserverPattern;
+using MazFramework.Foundation.Events;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -113,7 +113,7 @@ namespace _PawSlidePopGame._Scripts.UI.Components.HUD
 
         private void OnDisable()
         {
-            EconomyManager economyManager = GetEconomyManager();
+            EconomyManager economyManager = EconomyManager.ExistingInstance;
             if (economyManager != null)
             {
                 economyManager.OnCoinsChanged -= HandleCoinsChanged;
@@ -423,17 +423,17 @@ namespace _PawSlidePopGame._Scripts.UI.Components.HUD
 
         private void KillTweens()
         {
-            _updateSequence?.Kill();
+            if (DOTween.instance != null) _updateSequence?.Kill();
             _updateSequence = null;
-            _countTween?.Kill();
+            if (DOTween.instance != null) _countTween?.Kill();
             _countTween = null;
         }
 
         private void KillIdleAndShakeTweens()
         {
-            _idleTween?.Kill();
+            if (DOTween.instance != null) _idleTween?.Kill();
             _idleTween = null;
-            _shakeTween?.Kill();
+            if (DOTween.instance != null) _shakeTween?.Kill();
             _shakeTween = null;
         }
 
@@ -459,7 +459,7 @@ namespace _PawSlidePopGame._Scripts.UI.Components.HUD
                 return;
             }
 
-            _idleTween?.Kill();
+            if (DOTween.instance != null) _idleTween?.Kill();
 
             if (iconIdleAnimType == IconIdleAnimType.Floating)
             {
@@ -493,9 +493,9 @@ namespace _PawSlidePopGame._Scripts.UI.Components.HUD
                 return;
             }
 
-            _idleTween?.Kill();
+            if (DOTween.instance != null) _idleTween?.Kill();
             _idleTween = null;
-            _shakeTween?.Kill();
+            if (DOTween.instance != null) _shakeTween?.Kill();
             _shakeTween = null;
 
             coinIcon.transform.localScale = _iconBaseScale;

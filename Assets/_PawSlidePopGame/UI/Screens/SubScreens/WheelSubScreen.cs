@@ -1,11 +1,12 @@
+using MazFramework.Audio;
+using MazFramework.Haptics;
+using PawAudioConfig = _PawSlidePopGame._Scripts.Data.Config.PawSlidePopAudioConfig;
 using System;
 using System.Collections.Generic;
-using _PawSlidePopGame._Scripts.Core.Audio;
-using _PawSlidePopGame._Scripts.Core.Vibration;
 using _PawSlidePopGame._Scripts.Feature.Match3.Boosters;
 using _PawSlidePopGame._Scripts.Feature.Meta.Wheel;
-using _PawSlidePopGame._Scripts.UI.Base;
-using _PawSlidePopGame._Scripts.UI.Manager;
+using _PawSlidePopGame._Scripts.Feature.Meta.Reward;
+using MazFramework.UI;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -56,7 +57,7 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
             }
 
             base.Init();
-            BindButton(spinButton, HandleSpinClicked);
+            if (spinButton != null) { spinButton.onClick.RemoveListener(HandleSpinClicked); spinButton.onClick.AddListener(HandleSpinClicked); }
             LoadSnapshot();
             BindSegments();
             RefreshState();
@@ -65,6 +66,7 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
         public override void Show()
         {
             base.Show();
+            if (spinButton != null) { spinButton.onClick.RemoveListener(HandleSpinClicked); spinButton.onClick.AddListener(HandleSpinClicked); }
             LoadSnapshot();
             BindSegments();
             RefreshState();
@@ -98,6 +100,7 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
 
         private void OnDisable()
         {
+            if (spinButton != null) spinButton.onClick.RemoveListener(HandleSpinClicked);
             WheelStateRepository.OnDataChanged -= HandleWheelDataChanged;
             KillSpinTween();
         }
@@ -310,13 +313,12 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
                         if (currentSegment != lastTickSegment)
                         {
                             lastTickSegment = currentSegment;
-                            if (AudioController.Instance != null)
+                            var audio = AudioManager.Instance;
+                            if (audio?.Config is PawAudioConfig config)
+                                audio.PlaySfx(config.UiSfx.clickNormal);
+                            if (MazFramework.Haptics.HapticManager.Instance != null)
                             {
-                                AudioController.Instance.PlayUISound(UISoundType.ClickNormal);
-                            }
-                            if (VibrationManager.Instance != null)
-                            {
-                                VibrationManager.Instance.PlayLightImpact(requireEnabled: true);
+                                MazFramework.Haptics.HapticManager.Instance.PlayLightImpact();
                             }
                         }
                     }
@@ -336,16 +338,15 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.SubScreens
         private void CompleteSpin(WheelRewardEntryData reward)
         {
             _isSpinning = false;
-            bool granted = WheelRewardGrantService.TryGrant(reward);
+            bool granted = reward != null && RewardGrantService.TryGrant(reward.Reward, "wheel_spin");
             if (granted)
             {
-                if (AudioController.Instance != null)
+                var audio = AudioManager.Instance;
+                if (audio?.Config is PawAudioConfig config)
+                    audio.PlaySfx(config.UiSfx.purchaseSuccess);
+                if (MazFramework.Haptics.HapticManager.Instance != null)
                 {
-                    AudioController.Instance.PlayUISound(UISoundType.PurchaseSuccess);
-                }
-                if (VibrationManager.Instance != null)
-                {
-                    VibrationManager.Instance.PlayMediumImpact();
+                    MazFramework.Haptics.HapticManager.Instance.PlayMediumImpact();
                 }
 
                 _stateRepository.MarkFreeSpinUsed();

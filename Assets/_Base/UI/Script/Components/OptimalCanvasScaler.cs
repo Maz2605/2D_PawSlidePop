@@ -1,7 +1,7 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 
-namespace _PawSlidePopGame._Scripts.Utils.UI
+namespace MazFramework.UI
 {
     [RequireComponent(typeof(CanvasScaler))]
     [ExecuteAlways] 
