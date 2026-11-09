@@ -1,5 +1,5 @@
 using System;
-using _PawSlidePopGame._Scripts.Core.System.DesignPattern.Singleton;
+using MazFramework.Foundation.Singleton;
 using _PawSlidePopGame._Scripts.Feature.Match3.Boosters;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.EconomyManager;
 

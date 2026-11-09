@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using _PawSlidePopGame._Scripts.Data.SaveSystem;
+using MazFramework.Persistence;
 using _PawSlidePopGame._Scripts.Feature.Match3.Boosters;
 
 namespace _PawSlidePopGame._Scripts.Gameplay.Meta.EconomyManager

@@ -10,7 +10,7 @@ namespace _PawSlidePopGame._Scripts.Gameplay.Meta.MapManager.Editor
 {
     public sealed class MapLevelBatchGeneratorWindow : EditorWindow
     {
-        private const string DefaultDatabasePath = "Assets/_PawSlidePopGame/_Data/Tiles/Database.asset";
+        private const string DefaultDatabasePath = "Assets/_PawSlidePopGame/Content/Data/Tiles/Database.asset";
 
         [SerializeField] private LevelGenerationProfileSO profile;
         [SerializeField] private Match3TileDatabaseSO tileDatabase;

@@ -1,5 +1,5 @@
 using System;
-using _PawSlidePopGame._Scripts.Core.System.DesignPattern.Singleton;
+using MazFramework.Foundation.Singleton;
 using UnityEngine;
 
 namespace _PawSlidePopGame._Scripts.Gameplay.Meta.EconomyManager

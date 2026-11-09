@@ -1,5 +1,5 @@
 using System;
-using _PawSlidePopGame._Scripts.Data.SaveSystem;
+using MazFramework.Persistence;
 
 namespace _PawSlidePopGame._Scripts.Feature.Meta.Wheel
 {
