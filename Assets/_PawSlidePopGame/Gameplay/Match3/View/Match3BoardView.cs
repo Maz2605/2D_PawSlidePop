@@ -1,3 +1,6 @@
+using MazFramework.Audio;
+using MazFramework.Haptics;
+using PawAudioConfig = _PawSlidePopGame._Scripts.Data.Config.PawSlidePopAudioConfig;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -10,9 +13,7 @@ using _PawSlidePopGame._Scripts.Feature.Match3.Model.Entities;
 using _PawSlidePopGame._Scripts.Feature.Match3.Presentation;
 using _PawSlidePopGame._Scripts.Feature.Match3.View.Factory;
 using _PawSlidePopGame._Scripts.Feature.Match3.Boosters;
-using _PawSlidePopGame._Scripts.Core.Audio;
-using _PawSlidePopGame._Scripts.Core.Vibration;
-using _PawSlidePopGame.Scripts.DesignPattern.ObjectPooling;
+using MazFramework.Foundation.Pooling;
 using UnityEngine;
 
 namespace _PawSlidePopGame._Scripts.Feature.Match3.View
@@ -660,14 +661,15 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.View
                 Camera.main.transform.DOShakePosition(0.15f, 0.15f, 20, 90f, false, true).SetLink(Camera.main.gameObject);
             }
 
-            if (VibrationManager.Instance != null)
+            if (MazFramework.Haptics.HapticManager.Instance != null)
             {
-                VibrationManager.Instance.PlayMediumImpact(true);
+                MazFramework.Haptics.HapticManager.Instance.PlayMediumImpact();
             }
 
-            if (AudioController.Instance != null)
             {
-                AudioController.Instance.PlayTileDrop();
+                var audio = AudioManager.Instance;
+                if (audio?.Config is PawAudioConfig config)
+                    audio.PlaySfx(config.Match3Sfx.tileDrop, cooldown: 0.08f, cooldownKey: "Paw.TileDrop");
             }
 
             SpawnShockwaveRing(1.5f, 0.25f, new Color(1f, 1f, 1.0f, 0.6f), targetWorldPos);
@@ -727,14 +729,15 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.View
                 Camera.main.transform.DOShakePosition(0.15f, 0.15f, 20, 90f, false, true).SetLink(Camera.main.gameObject);
             }
 
-            if (VibrationManager.Instance != null)
+            if (MazFramework.Haptics.HapticManager.Instance != null)
             {
-                VibrationManager.Instance.PlayMediumImpact(true);
+                MazFramework.Haptics.HapticManager.Instance.PlayMediumImpact();
             }
 
-            if (AudioController.Instance != null)
             {
-                AudioController.Instance.PlayTileSlide();
+                var audio = AudioManager.Instance;
+                if (audio?.Config is PawAudioConfig config)
+                    audio.PlaySfx(config.Match3Sfx.tileSlide, cooldown: 0.08f, cooldownKey: "Paw.TileSlide");
             }
 
             bool animationDone = false;
@@ -799,14 +802,15 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.View
                 Camera.main.transform.DOShakePosition(0.12f, 0.12f, 20, 90f, false, true).SetLink(Camera.main.gameObject);
             }
 
-            if (VibrationManager.Instance != null)
+            if (MazFramework.Haptics.HapticManager.Instance != null)
             {
-                VibrationManager.Instance.PlayLightImpact(true);
+                MazFramework.Haptics.HapticManager.Instance.PlayLightImpact();
             }
 
-            if (AudioController.Instance != null)
             {
-                AudioController.Instance.PlayTileDrop();
+                var audio = AudioManager.Instance;
+                if (audio?.Config is PawAudioConfig config)
+                    audio.PlaySfx(config.Match3Sfx.tileDrop, cooldown: 0.08f, cooldownKey: "Paw.TileDrop");
             }
 
             bool animationDone = false;
@@ -836,9 +840,9 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.View
                 Camera.main.transform.DOComplete();
                 Camera.main.transform.DOShakePosition(0.3f, 0.18f, 25, 90f, false, true).SetLink(Camera.main.gameObject);
             }
-            if (VibrationManager.Instance != null)
+            if (MazFramework.Haptics.HapticManager.Instance != null)
             {
-                VibrationManager.Instance.PlayLightImpact(true);
+                MazFramework.Haptics.HapticManager.Instance.PlayLightImpact();
             }
 
             yield return new WaitForSeconds(0.1f);

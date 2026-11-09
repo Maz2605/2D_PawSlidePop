@@ -1,3 +1,6 @@
+using MazFramework.Audio;
+using MazFramework.Haptics;
+using PawAudioConfig = _PawSlidePopGame._Scripts.Data.Config.PawSlidePopAudioConfig;
 using System;
 using System.Collections.Generic;
 using _PawSlidePopGame._Scripts.Data.Events;
@@ -9,7 +12,7 @@ using _PawSlidePopGame._Scripts.Feature.Match3.Presentation;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.EconomyManager;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.Inventory;
 using _PawSlidePopGame._Scripts.Services.Analytics;
-using _PawSlidePopGame.Scripts.DesignPattern.ObserverPattern;
+using MazFramework.Foundation.Events;
 using UnityEngine;
 
 namespace _PawSlidePopGame._Scripts.Feature.Match3.Boosters
@@ -73,7 +76,12 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Boosters
             if (!CanSelectBooster(definition))
             {
                 LogDebug($"Rejected {definition.BoosterType}. Count={BoosterInventory.Instance.GetCount(definition)}, Coins={EconomyManager.Instance.Coins}, Price={definition.CoinPrice}.");
-                EventManager<FeedbackEvent>.Post(FeedbackEvent.BoosterReject);
+                {
+                    var audio = AudioManager.Instance;
+                    if (audio?.Config is PawAudioConfig config)
+                        audio.PlaySfx(config.Match3Sfx.boosterReject);
+                    HapticManager.Instance?.PlayWarning();
+                }
                 OnBoosterUseRejected?.Invoke(definition);
                 return false;
             }
@@ -88,7 +96,12 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Boosters
             _activeBooster = definition;
             _activePaymentSource = ResolvePaymentSource(definition);
             LogDebug($"Selected {definition.BoosterType}. PaymentSource={_activePaymentSource}.");
-            EventManager<FeedbackEvent>.Post(FeedbackEvent.BoosterSelect);
+            {
+                var audio = AudioManager.Instance;
+                if (audio?.Config is PawAudioConfig config)
+                    audio.PlaySfx(config.Match3Sfx.boosterSelect);
+                HapticManager.Instance?.PlayMediumImpact();
+            }
             OnActiveBoosterChanged?.Invoke(_activeBooster);
             return true;
         }
@@ -134,7 +147,12 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Boosters
             if (cell == null || GameFlowManager.Instance == null || !GameFlowManager.Instance.CanUseBoosterAt(_activeBooster, cell.X, cell.Y))
             {
                 LogDebug($"Tap booster rejected. Booster={_activeBooster.BoosterType}, Cell={cell?.X},{cell?.Y}, State={GameFlowManager.Instance?.CurrentInGameSubState}.");
-                EventManager<FeedbackEvent>.Post(FeedbackEvent.BoosterReject);
+                {
+                    var audio = AudioManager.Instance;
+                    if (audio?.Config is PawAudioConfig config)
+                        audio.PlaySfx(config.Match3Sfx.boosterReject);
+                    HapticManager.Instance?.PlayWarning();
+                }
                 return true;
             }
 
@@ -159,7 +177,12 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Boosters
             if (GameFlowManager.Instance == null || !GameFlowManager.Instance.CanUseBoosterLine(_activeBooster, request.Axis, request.LineIndex))
             {
                 LogDebug($"Line booster rejected. Booster={_activeBooster.BoosterType}, Axis={request.Axis}, Line={request.LineIndex}, State={GameFlowManager.Instance?.CurrentInGameSubState}, CanCommands={GameFlowManager.Instance?.CanAcceptGameplayCommands}.");
-                EventManager<FeedbackEvent>.Post(FeedbackEvent.BoosterReject);
+                {
+                    var audio = AudioManager.Instance;
+                    if (audio?.Config is PawAudioConfig config)
+                        audio.PlaySfx(config.Match3Sfx.boosterReject);
+                    HapticManager.Instance?.PlayWarning();
+                }
                 return true;
             }
 
@@ -177,7 +200,12 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Boosters
             if (definition == null || GameFlowManager.Instance == null || !CanSelectBooster(definition) || !GameFlowManager.Instance.CanUseImmediateBooster(definition))
             {
                 LogDebug($"Immediate booster rejected. Booster={definition?.BoosterType}, State={GameFlowManager.Instance?.CurrentInGameSubState}, CanCommands={GameFlowManager.Instance?.CanAcceptGameplayCommands}.");
-                EventManager<FeedbackEvent>.Post(FeedbackEvent.BoosterReject);
+                {
+                    var audio = AudioManager.Instance;
+                    if (audio?.Config is PawAudioConfig config)
+                        audio.PlaySfx(config.Match3Sfx.boosterReject);
+                    HapticManager.Instance?.PlayWarning();
+                }
                 OnBoosterUseRejected?.Invoke(definition);
                 return;
             }
@@ -198,9 +226,12 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Boosters
                     result.BoosterType = definition.BoosterType;
                 }
 
-                EventManager<FeedbackEvent>.Post(
-                    FeedbackEvent.BoosterUse,
-                    new BoosterFeedbackPayload(definition != null ? definition.BoosterType : BoosterType.None));
+                {
+                    var audio = AudioManager.Instance;
+                    if (audio?.Config is PawAudioConfig config)
+                        audio.PlaySfx(definition != null && definition.BoosterType == BoosterType.Shuffle
+                            ? config.Match3Sfx.shuffle : config.Match3Sfx.boosterUse);
+                }
                 if (paymentSource == BoosterPaymentSource.Inventory)
                 {
                     BoosterInventory.Instance.TryConsumeBooster(definition, "booster_used");

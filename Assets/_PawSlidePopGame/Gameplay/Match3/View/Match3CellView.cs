@@ -1,4 +1,4 @@
-using _PawSlidePopGame.Scripts.DesignPattern.ObjectPooling;
+using MazFramework.Foundation.Pooling;
 using UnityEngine;
 using _PawSlidePopGame._Scripts.Feature.Match3.Core.Enum;
 

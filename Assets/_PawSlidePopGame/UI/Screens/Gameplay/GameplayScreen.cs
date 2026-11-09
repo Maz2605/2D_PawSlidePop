@@ -3,9 +3,9 @@ using _PawSlidePopGame._Scripts.Core.System.GameFlow;
 using _PawSlidePopGame._Scripts.Data.Events;
 using _PawSlidePopGame._Scripts.Data.Events.Payloads;
 using _PawSlidePopGame._Scripts.Feature.Match3.Presenter;
-using _PawSlidePopGame._Scripts.UI.Base;
+using MazFramework.UI;
 using _PawSlidePopGame._Scripts.UI.Components.HUD;
-using _PawSlidePopGame.Scripts.DesignPattern.ObserverPattern;
+using MazFramework.Foundation.Events;
 using _PawSlidePopGame._Scripts.Feature.Match3.Boosters;
 using DG.Tweening;
 using UnityEngine;
@@ -28,7 +28,9 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.Gameplay
 
         public static GameplayScreen Instance { get; private set; }
 
-        private System.Collections.Generic.List<SpriteRenderer> _backgroundRenderers;
+        public event System.Action HidingStarted;
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetInstance() => Instance = null;
 
         protected override void Awake()
         {
@@ -37,8 +39,9 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.Gameplay
             EnsurePausePopupPresenter();
         }
 
-        protected virtual void OnDestroy()
+        protected override void OnDestroy()
         {
+            base.OnDestroy();
             if (Instance == this)
             {
                 Instance = null;
@@ -64,8 +67,11 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.Gameplay
             }
         }
 
-        private void OnDisable()
+        protected override void OnDisable()
         {
+            if (pauseButton != null) pauseButton.onClick.RemoveListener(HandlePausePressed);
+            if (skipSugarCrushButton != null) skipSugarCrushButton.onClick.RemoveListener(HandleSkipSugarCrushPressed);
+            base.OnDisable();
             EventManager<LogicGameEvent>.RemoveListener<InGameSubStateChangedPayload>(
                 LogicGameEvent.InGameSubStateChanged,
                 HandleSubStateChanged);
@@ -81,12 +87,10 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.Gameplay
         {
             topHUDPresenter?.ResetView();
             bottomHUDPresenter?.ResetView();
-            SetBackgroundDimmed(false, 0f);
             SetButtonDimmed(pauseButton, false, 0f);
             SetButtonDimmed(skipSugarCrushButton, false, 0f);
 
-            BindButton(pauseButton, HandlePausePressed);
-            BindButton(skipSugarCrushButton, HandleSkipSugarCrushPressed);
+            if (pauseButton != null) { pauseButton.onClick.RemoveListener(HandlePausePressed); pauseButton.onClick.AddListener(HandlePausePressed); }
             if (skipSugarCrushButton != null)
             {
                 skipSugarCrushButton.gameObject.SetActive(false);
@@ -98,9 +102,9 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.Gameplay
 
         protected override void OnBeforeHide()
         {
+            HidingStarted?.Invoke();
             topHUDPresenter?.ResetView();
             bottomHUDPresenter?.ResetView();
-            SetBackgroundDimmed(false, 0f);
             SetButtonDimmed(pauseButton, false, 0f);
             SetButtonDimmed(skipSugarCrushButton, false, 0f);
 
@@ -144,7 +148,9 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.Gameplay
                 if (skipSugarCrushButton != null)
                 {
                     bool show = moves > 0;
+                    skipSugarCrushButton.onClick.RemoveListener(HandleSkipSugarCrushPressed);
                     skipSugarCrushButton.gameObject.SetActive(show);
+                    if (show) skipSugarCrushButton.onClick.AddListener(HandleSkipSugarCrushPressed);
                     if (show)
                     {
                         skipSugarCrushButton.transform.DOKill();
@@ -208,8 +214,10 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.Gameplay
             }
         }
 
-        private void OnValidate()
+#if UNITY_EDITOR
+        protected override void OnValidate()
         {
+            base.OnValidate();
             if (topHUDPresenter == null)
             {
                 topHUDPresenter = GetComponentInChildren<TopHUDPresenter>(true);
@@ -221,64 +229,19 @@ namespace _PawSlidePopGame._Scripts.UI.Screens.Gameplay
             }
         }
 
+#endif
+
         private void HandleActiveBoosterChanged(BoosterDefinitionSO activeBooster)
         {
             bool isBoosterActive = activeBooster != null;
 
-            // 1. Darken the background
-            SetBackgroundDimmed(isBoosterActive);
-
-            // 2. Darken HUD presenters
+            // Darken HUD presenters
             topHUDPresenter?.SetDimmed(isBoosterActive);
             bottomHUDPresenter?.SetDimmed(isBoosterActive, activeBooster);
 
-            // 3. Darken other screen buttons
+            // Darken other screen buttons
             SetButtonDimmed(pauseButton, isBoosterActive);
             SetButtonDimmed(skipSugarCrushButton, isBoosterActive);
-        }
-
-        private void CacheBackgroundRenderers()
-        {
-            if (_backgroundRenderers != null) return;
-            _backgroundRenderers = new System.Collections.Generic.List<SpriteRenderer>();
-
-            var fitters = FindObjectsByType<SmartBackgroundFitter>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach (var fitter in fitters)
-            {
-                if (fitter != null && fitter.TryGetComponent<SpriteRenderer>(out var sr))
-                {
-                    if (!_backgroundRenderers.Contains(sr))
-                        _backgroundRenderers.Add(sr);
-                }
-            }
-
-            var allSpriteRenderers = FindObjectsByType<SpriteRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach (var sr in allSpriteRenderers)
-            {
-                if (sr == null || sr.GetComponent<SmartBackgroundFitter>() != null) continue;
-
-                string lowerName = sr.name.ToLower();
-                if (lowerName.Contains("background") || lowerName.Contains("bg"))
-                {
-                    if (!_backgroundRenderers.Contains(sr))
-                        _backgroundRenderers.Add(sr);
-                }
-            }
-        }
-
-        private void SetBackgroundDimmed(bool isDimmed, float duration = 0.25f)
-        {
-            CacheBackgroundRenderers();
-            Color targetColor = isDimmed ? new Color(0.35f, 0.35f, 0.35f, 1f) : Color.white;
-
-            foreach (var sr in _backgroundRenderers)
-            {
-                if (sr != null)
-                {
-                    sr.DOKill();
-                    sr.DOColor(targetColor, duration).SetEase(Ease.OutQuad).SetUpdate(true);
-                }
-            }
         }
 
         private void SetButtonDimmed(Button button, bool isDimmed, float duration = 0.25f)

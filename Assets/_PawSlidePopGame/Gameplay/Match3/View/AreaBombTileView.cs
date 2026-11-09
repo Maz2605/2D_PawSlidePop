@@ -1,7 +1,6 @@
 using System.Collections;
 using DG.Tweening;
 using UnityEngine;
-using _PawSlidePopGame._Scripts.Core.Vibration;
 
 namespace _PawSlidePopGame._Scripts.Feature.Match3.View
 {
@@ -20,9 +19,9 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.View
         public override IEnumerator PlayActivateAsync()
         {
             // Trigger haptic vibration on activation
-            if (VibrationManager.Instance != null)
+            if (MazFramework.Haptics.HapticManager.Instance != null)
             {
-                VibrationManager.Instance.PlayMediumImpact(true);
+                MazFramework.Haptics.HapticManager.Instance.PlayMediumImpact();
             }
 
             // Do NOT shake the board/camera on activation
@@ -47,9 +46,9 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.View
         public override IEnumerator PlayClearAsync(bool isExplosion = false)
         {
             // Trigger haptic vibration on explosion
-            if (VibrationManager.Instance != null)
+            if (MazFramework.Haptics.HapticManager.Instance != null)
             {
-                VibrationManager.Instance.PlayMediumImpact(true);
+                MazFramework.Haptics.HapticManager.Instance.PlayMediumImpact();
             }
 
             // Snappy camera shake

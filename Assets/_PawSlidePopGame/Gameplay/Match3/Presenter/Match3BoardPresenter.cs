@@ -1,7 +1,9 @@
+using MazFramework.Audio;
+using MazFramework.Haptics;
+using PawAudioConfig = _PawSlidePopGame._Scripts.Data.Config.PawSlidePopAudioConfig;
 using System.Collections.Generic;
 using TMPro;
 using _PawSlidePopGame._Scripts.UI.Components.HUD;
-using _PawSlidePopGame._Scripts.Core.Vibration;
 using _PawSlidePopGame._Scripts.UI.Screens.Gameplay;
 using _PawSlidePopGame._Scripts.Core.System.GameFlow;
 using _PawSlidePopGame._Scripts.Data.Events;
@@ -16,7 +18,7 @@ using _PawSlidePopGame._Scripts.Feature.Match3.Model.Board;
 using _PawSlidePopGame._Scripts.Feature.Match3.Model.Entities;
 using _PawSlidePopGame._Scripts.Feature.Match3.Presentation;
 using _PawSlidePopGame._Scripts.Feature.Match3.View;
-using _PawSlidePopGame.Scripts.DesignPattern.ObserverPattern;
+using MazFramework.Foundation.Events;
 using DG.Tweening;
 using UnityEngine;
 
@@ -36,6 +38,87 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
 
         public bool IsVictoryOutroPlaying { get; private set; }
         private bool _skipSugarCrush;
+        private Coroutine _victoryRoutine;
+        private GameFlowManager _victoryFlow;
+        private long _victorySessionId;
+        private System.Random _victoryRandom;
+        private List<BoosterTileDefinitionSO> _victoryBoosters;
+
+        private void CancelVictoryPresentation()
+        {
+            if (_victoryRoutine != null) StopCoroutine(_victoryRoutine);
+            _victoryRoutine = null;
+            IsVictoryOutroPlaying = false;
+        }
+
+        public bool TryCompleteVictoryImmediately(long sessionId)
+        {
+            var flow = _victoryFlow != null ? _victoryFlow : GameFlowManager.ExistingInstance;
+            if (flow == null || flow.SessionId != sessionId || sessionId <= 0) return false;
+            if (flow.IsResultFinalized) return flow.ResultWon;
+            CancelVictoryPresentation();
+            _victoryFlow = flow;
+            _victorySessionId = sessionId;
+            if (gameManager?.Board == null) return false;
+            _victoryRandom = _victoryRandom ?? gameManager.Random ?? new System.Random();
+            _victoryBoosters = _victoryBoosters ?? GetVictoryBoosters();
+            if (!ResolveVictoryRemainder()) return false;
+            flow.ForcePublishHudState();
+            _isAnimatingMove = false;
+            return flow.FinalizeResult(sessionId, true);
+        }
+
+        private List<BoosterTileDefinitionSO> GetVictoryBoosters()
+        {
+            var definitions = new List<BoosterTileDefinitionSO>();
+            if (gameManager.TileDatabase == null) return definitions;
+            foreach (TileLogicType type in new[] { TileLogicType.BombBooster, TileLogicType.CrossBomb, TileLogicType.SquareBomb })
+            {
+                var definition = gameManager.TileDatabase.GetBoosterDefinition(type);
+                if (definition != null) definitions.Add(definition);
+            }
+            if (definitions.Count == 0)
+                foreach (var definition in gameManager.TileDatabase.Tiles)
+                    if (definition is BoosterTileDefinitionSO booster) { definitions.Add(booster); break; }
+            return definitions;
+        }
+
+        private bool ResolveVictoryRemainder()
+        {
+            var board = gameManager?.Board;
+            if (board == null) return false;
+            while (board.RemainingMoves > 0 && _victoryBoosters.Count > 0)
+            {
+                var cells = new List<CellModel>();
+                foreach (var cell in board.GetAllCells())
+                    if (cell != null && cell.IsPlayable && cell.Tile != null && cell.Tile.TileKind == TileKind.Normal) cells.Add(cell);
+                if (cells.Count == 0) break;
+                var cellToConvert = cells[_victoryRandom.Next(cells.Count)];
+                var definition = _victoryBoosters[_victoryRandom.Next(_victoryBoosters.Count)];
+                var tile = board.CreateTileFromDefinitionId(definition.TileId, gameManager.TileDatabase);
+                if (tile == null) return false;
+                board.SetTile(cellToConvert, TileStackLayer.Base, tile);
+                board.AddScore(scorePerRemainingMove);
+                board.ConsumeMove();
+            }
+            int budget = System.Math.Max(256, board.Width * board.Height * 32);
+            while (true)
+            {
+                CellModel target = null;
+                for (int y = board.Height - 1; y >= 0 && target == null; y--)
+                    for (int x = 0; x < board.Width; x++)
+                    {
+                        var cell = board.GetCell(x, y);
+                        if (cell != null && cell.IsPlayable && cell.Tile != null && cell.Tile.TileKind == TileKind.Booster && cell.CanTileActivate())
+                        { target = cell; break; }
+                    }
+                if (target == null) return true;
+                if (--budget < 0) { Debug.LogError("[Match3BoardPresenter] Sugar Crush made no bounded progress.", this); return false; }
+                var result = BoardResolutionService.ExecuteSugarCrushActivation(board, target.X, target.Y,
+                    gameManager.LevelData, gameManager.TileDatabase, _victoryRandom, gameManager.RuleSet);
+                if (!result.IsApplied) return false;
+            }
+        }
 
         [Header("Sugar Crush Settings")]
         [SerializeField] private float sugarCrushSpawnDelay = 0.05f;
@@ -131,6 +214,7 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
 
         private void OnDisable()
         {
+            CancelVictoryPresentation();
             if (gameManager != null)
             {
                 gameManager.OnBoardInitialized -= HandleBoardInitialized;
@@ -292,7 +376,12 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
                 rectTransform.localScale = Vector3.zero;
 
                 // Play Audio and pop up at center
-                EventManager<FeedbackEvent>.Post(FeedbackEvent.BoosterSelect);
+                {
+                    var audio = AudioManager.Instance;
+                    if (audio?.Config is PawAudioConfig config)
+                        audio.PlaySfx(config.Match3Sfx.boosterSelect);
+                    HapticManager.Instance?.PlayMediumImpact();
+                }
 
                 bool reached = false;
                 Sequence seq = DOTween.Sequence().SetLink(flyObj);
@@ -312,7 +401,12 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
                     int previousMoves = gameManager.Board.RemainingMoves;
                     gameManager.Board.AddMoves(definition.ExtraMovesAmount);
                     
-                    EventManager<FeedbackEvent>.Post(FeedbackEvent.MoveSuccess);
+                    {
+                        var audio = AudioManager.Instance;
+                        if (audio?.Config is PawAudioConfig config)
+                            audio.PlaySfx(config.Match3Sfx.swapSuccess);
+                        HapticManager.Instance?.PlayMediumImpact();
+                    }
 
                     EventManager<LogicGameEvent>.Post(
                         LogicGameEvent.GameplayMovesChanged,
@@ -335,7 +429,7 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
                         }
                     }
 
-                    EventManager<FeedbackEvent>.Post(FeedbackEvent.SpecialTileCreated, new SpecialTileFeedbackPayload(tileLogicType));
+                    PlaySpecialCreatedAudio(tileLogicType);
 
                     TileModel tile = targetCell.Tile;
                     if (tile != null)
@@ -357,6 +451,11 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
 
         public void ResetPresentation()
         {
+            CancelVictoryPresentation();
+            _victorySessionId = 0;
+            _victoryFlow = null;
+            _victoryBoosters = null;
+            _victoryRandom = null;
             _isBoardBound = false;
             if (_movePlaybackRoutine != null)
             {
@@ -449,7 +548,12 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
             {
                 if (!GameFlowManager.Instance.CanPlaceChargedBoosterAt(cell.X, cell.Y))
                 {
-                    EventManager<FeedbackEvent>.Post(FeedbackEvent.MoveReject);
+                    {
+                        var audio = AudioManager.Instance;
+                        if (audio?.Config is PawAudioConfig config)
+                            audio.PlaySfx(config.Match3Sfx.swapInvalid);
+                        HapticManager.Instance?.PlayWarning();
+                    }
                     return;
                 }
 
@@ -470,7 +574,12 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
             {
                 if (!GameFlowManager.Instance.CanConfirmChargedComboAt(cell.X, cell.Y))
                 {
-                    EventManager<FeedbackEvent>.Post(FeedbackEvent.MoveReject);
+                    {
+                        var audio = AudioManager.Instance;
+                        if (audio?.Config is PawAudioConfig config)
+                            audio.PlaySfx(config.Match3Sfx.swapInvalid);
+                        HapticManager.Instance?.PlayWarning();
+                    }
                     GameFlowManager.Instance.CancelChargedAbilityMode();
                     return;
                 }
@@ -568,13 +677,23 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
 
             if (executionResult.IsApplied && boardView != null)
             {
-                EventManager<FeedbackEvent>.Post(FeedbackEvent.MoveSuccess);
+                {
+                    var audio = AudioManager.Instance;
+                    if (audio?.Config is PawAudioConfig config)
+                        audio.PlaySfx(config.Match3Sfx.swapSuccess);
+                    HapticManager.Instance?.PlayMediumImpact();
+                }
                 yield return StartCoroutine(boardView.PlayMoveExecution(executionResult));
                 boardView.SyncToBoardState();
             }
             else if (!executionResult.IsAccepted)
             {
-                EventManager<FeedbackEvent>.Post(FeedbackEvent.MoveReject);
+                {
+                    var audio = AudioManager.Instance;
+                    if (audio?.Config is PawAudioConfig config)
+                        audio.PlaySfx(config.Match3Sfx.swapInvalid);
+                    HapticManager.Instance?.PlayWarning();
+                }
             }
 
             GameFlowManager.Instance?.NotifyResolutionPlaybackComplete(executionResult);
@@ -633,9 +752,7 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
                 return;
             }
 
-            EventManager<FeedbackEvent>.Post(
-                FeedbackEvent.SpecialTileActivated,
-                new SpecialTileFeedbackPayload(activateOp.LogicType));
+            PlaySpecialActivatedAudio(activateOp.LogicType);
         }
 
         private void HandleTileClearPlaybackStarted(TileClearOp clearOp, Vector3 worldPosition)
@@ -650,9 +767,7 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
                 return;
             }
 
-            EventManager<FeedbackEvent>.Post(
-                FeedbackEvent.SpecialTileCreated,
-                new SpecialTileFeedbackPayload(specialCreateOp.LogicType));
+            PlaySpecialCreatedAudio(specialCreateOp.LogicType);
         }
 
         private void HandleScoreGainPlaybackStarted(ScoreGainOp scoreGainOp)
@@ -670,13 +785,18 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
             }
             else if (payload.Current == InGameSubState.Victory)
             {
-                StartCoroutine(PlayVictoryOutroRoutine());
+                CancelVictoryPresentation();
+                _victoryFlow = GameFlowManager.ExistingInstance;
+                _victorySessionId = _victoryFlow != null ? _victoryFlow.SessionId : 0;
+                _victoryRoutine = StartCoroutine(PlayVictoryOutroRoutine());
             }
         }
 
         public void SkipSugarCrush()
         {
             _skipSugarCrush = true;
+            if (_victoryRoutine == null && _victorySessionId != 0 && _victoryFlow != null && !_victoryFlow.IsResultFinalized)
+                TryCompleteVictoryImmediately(_victorySessionId);
         }
 
         private System.Collections.IEnumerator PlayDefeatOutroRoutine()
@@ -708,39 +828,19 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
             {
                 IsVictoryOutroPlaying = false;
                 _isAnimatingMove = false;
+                _victoryFlow?.FinalizeResult(_victorySessionId, true);
                 yield break;
             }
 
             int remainingMoves = gameManager.Board.RemainingMoves;
             System.Random random = gameManager.Random ?? new System.Random();
 
-            // Lấy danh sách booster từ database
-            List<BoosterTileDefinitionSO> boosterDefinitions = new List<BoosterTileDefinitionSO>();
-            if (gameManager.TileDatabase != null)
-            {
-                var bombDef = gameManager.TileDatabase.GetBoosterDefinition(TileLogicType.BombBooster);
-                var crossDef = gameManager.TileDatabase.GetBoosterDefinition(TileLogicType.CrossBomb);
-                var squareDef = gameManager.TileDatabase.GetBoosterDefinition(TileLogicType.SquareBomb);
-                if (bombDef != null) boosterDefinitions.Add(bombDef);
-                if (crossDef != null) boosterDefinitions.Add(crossDef);
-                if (squareDef != null) boosterDefinitions.Add(squareDef);
-            }
-
-            if (boosterDefinitions.Count == 0 && gameManager.TileDatabase != null && gameManager.TileDatabase.BoosterTileCount > 0)
-            {
-                var tiles = gameManager.TileDatabase.Tiles;
-                for (int i = 0; i < tiles.Count; i++)
-                {
-                    if (tiles[i] is BoosterTileDefinitionSO booster)
-                    {
-                        boosterDefinitions.Add(booster);
-                        break;
-                    }
-                }
-            }
+            _victoryRandom = random;
+            List<BoosterTileDefinitionSO> boosterDefinitions = GetVictoryBoosters();
+            _victoryBoosters = boosterDefinitions;
 
             // GIAI ĐOẠN 1: Biến đổi Moves thành Special Tiles
-            while (remainingMoves > 0 && !_skipSugarCrush)
+            while (remainingMoves > 0 && !_skipSugarCrush && boosterDefinitions.Count > 0)
             {
                 List<CellModel> normalCells = new List<CellModel>();
                 foreach (CellModel cell in gameManager.Board.GetAllCells())
@@ -806,6 +906,7 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
                     }
                 }
 
+                if (remainingMoves == gameManager.Board.RemainingMoves) { _skipSugarCrush = true; break; }
                 remainingMoves = gameManager.Board.RemainingMoves;
                 yield return new WaitForSeconds(sugarCrushSpawnDelay);
             }
@@ -817,15 +918,17 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
             }
 
             // GIAI ĐOẠN 2: Kích nổ liên hoàn
+            int activationBudget = System.Math.Max(256, gameManager.Board.Width * gameManager.Board.Height * 32);
             while (!_skipSugarCrush)
             {
+                if (--activationBudget < 0) { _skipSugarCrush = true; break; }
                 CellModel targetCell = null;
                 for (int y = gameManager.Board.Height - 1; y >= 0; y--)
                 {
                     for (int x = 0; x < gameManager.Board.Width; x++)
                     {
                         CellModel cell = gameManager.Board.GetCell(x, y);
-                        if (cell != null && cell.IsPlayable && cell.Tile != null && cell.Tile.TileKind == TileKind.Booster)
+                        if (cell != null && cell.IsPlayable && cell.Tile != null && cell.Tile.TileKind == TileKind.Booster && cell.CanTileActivate())
                         {
                             targetCell = cell;
                             break;
@@ -842,6 +945,8 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
                 BoardMoveExecutionResult result = BoardResolutionService.ExecuteSugarCrushActivation(
                     gameManager.Board, targetCell.X, targetCell.Y, gameManager.LevelData, gameManager.TileDatabase, random, gameManager.RuleSet);
 
+                if (!result.IsApplied) { _skipSugarCrush = true; break; }
+
                 if (boardView != null)
                 {
                     // Rung và lắc camera khi bắt đầu kích nổ tạo cảm giác mạnh mẽ
@@ -852,9 +957,9 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
                             .SetLink(Camera.main.gameObject);
                     }
 
-                    if (VibrationManager.Instance != null)
+                    if (MazFramework.Haptics.HapticManager.Instance != null)
                     {
-                        VibrationManager.Instance.PlayMediumImpact(true);
+                        MazFramework.Haptics.HapticManager.Instance.PlayMediumImpact();
                     }
 
                     yield return StartCoroutine(boardView.PlayMoveExecution(result));
@@ -865,73 +970,25 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
                 yield return new WaitForSeconds(sugarCrushExplodeDelay);
             }
 
-            // GIAI ĐOẠN 3: NỔ NHANH LẬP TỨC (FAST RESOLVE) NẾU SKIP
             if (_skipSugarCrush)
             {
-                boardView?.ClearPreview();
-
-                remainingMoves = gameManager.Board.RemainingMoves;
-                while (remainingMoves > 0)
+                if (!ResolveVictoryRemainder())
                 {
-                    List<CellModel> normalCells = new List<CellModel>();
-                    foreach (CellModel cell in gameManager.Board.GetAllCells())
-                    {
-                        if (cell != null && cell.IsPlayable && cell.Tile != null && cell.Tile.TileKind == TileKind.Normal)
-                        {
-                            normalCells.Add(cell);
-                        }
-                    }
-
-                    if (normalCells.Count == 0) break;
-
-                    CellModel chosenCell = normalCells[random.Next(0, normalCells.Count)];
-                    BoosterTileDefinitionSO chosenBooster = boosterDefinitions.Count > 0 
-                        ? boosterDefinitions[random.Next(0, boosterDefinitions.Count)]
-                        : null;
-
-                    if (chosenBooster != null)
-                    {
-                        TileModel createdTile = gameManager.Board.CreateTileFromDefinitionId(chosenBooster.TileId, gameManager.TileDatabase);
-                        if (createdTile != null)
-                        {
-                            gameManager.Board.SetTile(chosenCell, TileStackLayer.Base, createdTile);
-                            gameManager.Board.AddScore(scorePerRemainingMove);
-                            gameManager.Board.ConsumeMove();
-                        }
-                    }
-                    remainingMoves = gameManager.Board.RemainingMoves;
+                    IsVictoryOutroPlaying = false;
+                    _victoryRoutine = null;
+                    Debug.LogError("[Match3BoardPresenter] Could not finalize Sugar Crush; result remains retryable.", this);
+                    yield break;
                 }
-
-                while (true)
-                {
-                    CellModel targetCell = null;
-                    for (int y = gameManager.Board.Height - 1; y >= 0; y--)
-                    {
-                        for (int x = 0; x < gameManager.Board.Width; x++)
-                        {
-                            CellModel cell = gameManager.Board.GetCell(x, y);
-                            if (cell != null && cell.IsPlayable && cell.Tile != null && cell.Tile.TileKind == TileKind.Booster)
-                            {
-                                targetCell = cell;
-                                break;
-                            }
-                        }
-                        if (targetCell != null) break;
-                    }
-
-                    if (targetCell == null) break;
-
-                    BoardResolutionService.ExecuteSugarCrushActivation(
-                        gameManager.Board, targetCell.X, targetCell.Y, gameManager.LevelData, gameManager.TileDatabase, random, gameManager.RuleSet);
-                }
-
                 boardView?.SyncToBoardState();
-                GameFlowManager.Instance?.ForcePublishHudState();
             }
-
             IsVictoryOutroPlaying = false;
             _isAnimatingMove = false;
-            GameFlowManager.Instance?.ForcePublishHudState();
+            _victoryRoutine = null;
+            if (_victoryFlow != null && _victoryFlow.SessionId == _victorySessionId)
+            {
+                _victoryFlow.ForcePublishHudState();
+                _victoryFlow.FinalizeResult(_victorySessionId, true);
+            }
         }
 
         private void ApplyInputState(InGameSubState subState)
@@ -1090,6 +1147,27 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
                    Destroy(textObj);
                })
                .SetLink(textObj);
+        }
+        private static void PlaySpecialCreatedAudio(TileLogicType logicType)
+        {
+            if (logicType == TileLogicType.None || logicType == TileLogicType.NormalAnimal) return;
+            var audio = AudioManager.Instance;
+            if (audio?.Config is PawAudioConfig config) audio.PlaySfx(config.Match3Sfx.specialCreated);
+        }
+
+        private static void PlaySpecialActivatedAudio(TileLogicType logicType)
+        {
+            if (logicType == TileLogicType.None || logicType == TileLogicType.NormalAnimal) return;
+            var audio = AudioManager.Instance;
+            if (!(audio?.Config is PawAudioConfig config)) return;
+            AudioClip clip = logicType switch
+            {
+                TileLogicType.BombBooster or TileLogicType.CrossBomb or TileLogicType.SquareBomb or
+                TileLogicType.AreaBombMedium or TileLogicType.AreaBombLarge or
+                TileLogicType.ChargedSweepBooster or TileLogicType.BoardClearBomb => config.Match3Sfx.explosion,
+                _ => config.Match3Sfx.specialActivated
+            };
+            audio.PlaySfx(clip);
         }
     }
 }

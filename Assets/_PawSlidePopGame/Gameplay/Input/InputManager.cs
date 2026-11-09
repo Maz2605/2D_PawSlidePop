@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using _PawSlidePopGame._Scripts.Core.System.DesignPattern.Singleton;
+using MazFramework.Foundation.Singleton;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;

@@ -1,10 +1,11 @@
+using MazFramework.Audio;
+using MazFramework.Haptics;
+using PawAudioConfig = _PawSlidePopGame._Scripts.Data.Config.PawSlidePopAudioConfig;
 using System.Collections;
-using _PawSlidePopGame._Scripts.Core.Audio;
-using _PawSlidePopGame._Scripts.Core.Vibration;
 using DG.Tweening;
 using _PawSlidePopGame._Scripts.Feature.Match3.Data;
 using _PawSlidePopGame._Scripts.Feature.Match3.Model.Entities;
-using _PawSlidePopGame.Scripts.DesignPattern.ObjectPooling;
+using MazFramework.Foundation.Pooling;
 using UnityEngine;
 
 namespace _PawSlidePopGame._Scripts.Feature.Match3.View
@@ -584,9 +585,10 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.View
             SetShadowState(TileShadowState.Active);
             KillMotionTweens();
 
-            if (AudioController.Instance != null)
             {
-                AudioController.Instance.PlayTileSlide();
+                var audio = AudioManager.Instance;
+                if (audio?.Config is PawAudioConfig config)
+                    audio.PlaySfx(config.Match3Sfx.tileSlide, cooldown: 0.08f, cooldownKey: "Paw.TileSlide");
             }
 
             float safeDuration = Mathf.Max(0.05f, duration);
@@ -656,13 +658,14 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.View
         {
             StopIdle();
 
-            if (AudioController.Instance != null)
             {
-                AudioController.Instance.PlayTileDrop();
+                var audio = AudioManager.Instance;
+                if (audio?.Config is PawAudioConfig config)
+                    audio.PlaySfx(config.Match3Sfx.tileDrop, cooldown: 0.08f, cooldownKey: "Paw.TileDrop");
             }
-            if (VibrationManager.Instance != null)
+            if (MazFramework.Haptics.HapticManager.Instance != null)
             {
-                VibrationManager.Instance.PlayLightImpact(requireEnabled: true);
+                MazFramework.Haptics.HapticManager.Instance.PlayLightImpact();
             }
 
             float duration = Mathf.Max(0.05f, landingDuration / speedMultiplier);

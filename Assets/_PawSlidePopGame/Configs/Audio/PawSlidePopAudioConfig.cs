@@ -69,7 +69,7 @@ namespace _PawSlidePopGame._Scripts.Data.Config
     }
 
     [CreateAssetMenu(fileName = "AudioConfig", menuName = "PawSlidePop/Core/Audio Config")]
-    public sealed class PawSlidePopAudioConfig : ScriptableObject
+    public sealed class PawSlidePopAudioConfig : MazFramework.Audio.AudioClipConfigSO
     {
         [Header("Music")]
         [SerializeField] private PawSlidePopMusicLibrary music = new PawSlidePopMusicLibrary();
@@ -80,8 +80,30 @@ namespace _PawSlidePopGame._Scripts.Data.Config
         [Header("UI SFX")]
         [SerializeField] private PawSlidePopUISfxLibrary uiSfx = new PawSlidePopUISfxLibrary();
 
+        [Header("Match Playback Tuning")]
+        [Min(0f)] public float matchSfxCooldown = 0.06f;
+        public int bigMatchScoreThreshold = 50;
+        public int comboScoreThreshold = 90;
+
         public PawSlidePopMusicLibrary Music => music;
         public PawSlidePopMatch3SfxLibrary Match3Sfx => match3Sfx;
         public PawSlidePopUISfxLibrary UiSfx => uiSfx;
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            if (music == null || uiSfx == null) return;
+            musicBackground = music.mainMenuBackground;
+            buttonClick = uiSfx.clickNormal;
+            backSound = uiSfx.clickBack;
+            popupOpen = uiSfx.popupOpenStandard;
+            popupClose = uiSfx.popupCloseStandard;
+            toggleOn = uiSfx.clickNormal;
+            toggleOff = uiSfx.clickNormal;
+            successSound = uiSfx.purchaseSuccess;
+            warningSound = uiSfx.toastError;
+            errorSound = uiSfx.toastError;
+            notificationSound = uiSfx.toastInfo;
+        }
+#endif
     }
 }

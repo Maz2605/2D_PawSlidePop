@@ -1,5 +1,5 @@
-using _PawSlidePopGame._Scripts.Core.DesignPattern.Factory;
-using _PawSlidePopGame.Scripts.DesignPattern.ObjectPooling;
+using MazFramework.Foundation.Factory;
+using MazFramework.Foundation.Pooling;
 using UnityEngine;
 
 namespace _PawSlidePopGame._Scripts.Feature.Match3.View.Factory
@@ -40,7 +40,7 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.View.Factory
                 return;
             }
 
-            PoolingManager manager = PoolingManager.Instance;
+            PoolingManager manager = PoolingManager.ExistingInstance;
             if (manager != null)
             {
                 manager.Despawn(visual.gameObject);
@@ -51,4 +51,5 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.View.Factory
         }
     }
 }
+
 
