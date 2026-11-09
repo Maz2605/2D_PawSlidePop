@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f683ce35b97a418bb34a6cfaf8c0f483, type: 3}
+  m_Name: AudioClipConfig
+  m_EditorClassIdentifier: Assembly-CSharp::MazFramework.Audio.AudioClipConfigSO
+  musicBackground: {fileID: 0}
+  buttonClick: {fileID: 0}
+  backSound: {fileID: 0}
+  popupOpen: {fileID: 0}
+  popupClose: {fileID: 0}
+  toggleOn: {fileID: 0}
+  toggleOff: {fileID: 0}
+  successSound: {fileID: 0}
+  warningSound: {fileID: 0}
+  errorSound: {fileID: 0}
+  notificationSound: {fileID: 0}
+  lightImpact: {fileID: 0}
+  mediumImpact: {fileID: 0}
+  heavyImpact: {fileID: 0}
+  sfxWin: []
+  sfxLose: []
