@@ -1,7 +1,9 @@
+using MazFramework.Audio;
+using MazFramework.Haptics;
+using PawAudioConfig = _PawSlidePopGame._Scripts.Data.Config.PawSlidePopAudioConfig;
 using System;
-using _PawSlidePopGame._Scripts.Core.Audio;
 using _PawSlidePopGame._Scripts.Core.System;
-using _PawSlidePopGame._Scripts.UI.Base;
+using MazFramework.UI;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
@@ -58,6 +60,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
         private bool _lastPreviewedVibrationState;
         private bool _shouldRestoreSettingsOnHide;
         private bool _hasActiveSession;
+        private SettingsSession _session;
 
         // ──────────────────────────────────────────────────────────
         // Lifecycle
@@ -90,6 +93,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             ResetLayoutState();
             _shouldRestoreSettingsOnHide = true;
             _hasActiveSession = true;
+            _session = new SettingsSession();
             LoadRuntimeValues();
             BindButtons();
             BindSliderIcons();
@@ -98,7 +102,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             RefreshVibrationIcon(animate: false);
         }
 
-        protected override void PlayShowAnimation()
+        protected override Tween CreateShowTween(CanvasGroup group, float duration)
         {
             _showSequence = DOTween.Sequence()
                 .SetUpdate(true)
@@ -112,10 +116,12 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                         .SetEase(showEase));
             }
 
-            _showSequence.OnComplete(() => SetButtonsInteractable(true));
+            _showSequence.AppendCallback(() => SetButtonsInteractable(true));
+            _showSequence.Insert(0f, group.DOFade(1f, ShowDuration));
+            return _showSequence;
         }
 
-        protected override void PlayHideAnimation(Action onComplete)
+        protected override Tween CreateHideTween(CanvasGroup group, float duration)
         {
             KillActiveTweens();
 
@@ -131,8 +137,9 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                         .SetEase(hideEase));
             }
 
-            hideSeq.Join(canvasGroup.DOFade(0f, moveDuration * 0.8f).SetEase(Ease.InQuad));
-            hideSeq.OnComplete(() => onComplete?.Invoke());
+            hideSeq.Join(CanvasGroup.DOFade(0f, moveDuration * 0.8f).SetEase(Ease.InQuad));
+            
+            return hideSeq;
         }
 
         // ──────────────────────────────────────────────────────────
@@ -142,28 +149,28 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
         private void BindButtons()
         {
             SetButtonsInteractable(false);
-            BindButton(btnClose,  HandleClosePressed);
-            BindButton(btnCancel, HandleCancelPressed);
-            BindButton(btnSave,   HandleSavePressed);
+            if (btnClose != null) { btnClose.onClick.RemoveListener(HandleClosePressed); btnClose.onClick.AddListener(HandleClosePressed); }
+            if (btnCancel != null) { btnCancel.onClick.RemoveListener(HandleCancelPressed); btnCancel.onClick.AddListener(HandleCancelPressed); }
+            if (btnSave != null) { btnSave.onClick.RemoveListener(HandleSavePressed); btnSave.onClick.AddListener(HandleSavePressed); }
         }
 
         private void BindSliderIcons()
         {
             if (musicSlider != null)
             {
-                musicSlider.onValueChanged.RemoveAllListeners();
+                musicSlider.onValueChanged.RemoveListener(HandleMusicSliderChanged);
                 musicSlider.onValueChanged.AddListener(HandleMusicSliderChanged);
             }
 
             if (sfxSlider != null)
             {
-                sfxSlider.onValueChanged.RemoveAllListeners();
+                sfxSlider.onValueChanged.RemoveListener(HandleSfxSliderChanged);
                 sfxSlider.onValueChanged.AddListener(HandleSfxSliderChanged);
             }
 
             if (vibrationSlider != null)
             {
-                vibrationSlider.onValueChanged.RemoveAllListeners();
+                vibrationSlider.onValueChanged.RemoveListener(HandleVibrationSliderChanged);
                 vibrationSlider.onValueChanged.AddListener(HandleVibrationSliderChanged);
             }
         }
@@ -246,7 +253,11 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
 
         private void HandleSavePressed()
         {
-            CommitSettingsState();
+            if (!CommitSettingsState())
+            {
+                UIManager.Instance?.ShowToast("Could not save settings. Please try again.");
+                return;
+            }
             _shouldRestoreSettingsOnHide = false;
             Hide();
         }
@@ -259,7 +270,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
         {
             if (btnClose)  btnClose.interactable  = enable;
             if (btnCancel) btnCancel.interactable  = enable;
-            if (btnSave)   btnSave.interactable    = enable;
+            if (btnSave)   btnSave.interactable    = enable && _session != null && _session.IsAvailable;
         }
 
         private void PrepareForShow()
@@ -278,7 +289,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
 
         private void LoadRuntimeValues()
         {
-            SettingsManager settingsManager = SettingsManager.Instance;
+            SettingsSession settingsManager = _session;
             if (settingsManager != null)
             {
                 settingsManager.RestoreSavedSettings();
@@ -303,7 +314,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
 
         private void ApplyVibrationState(bool enabled, bool animate)
         {
-            SettingsManager.Instance?.PreviewVibration(enabled);
+            _session?.PreviewVibration(enabled);
 
             if (vibrationSlider == null)
             {
@@ -321,7 +332,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             bool isOn = vibrationSlider != null && vibrationSlider.value >= 0.5f;
             _currentVibrationEnabled = isOn;
             RefreshVibrationIcon(animate: true);
-            SettingsManager.Instance?.PreviewVibration(_currentVibrationEnabled, playFeedback: _currentVibrationEnabled && !_lastPreviewedVibrationState);
+            _session?.PreviewVibration(_currentVibrationEnabled, playFeedback: _currentVibrationEnabled && !_lastPreviewedVibrationState);
 
             _lastPreviewedVibrationState = _currentVibrationEnabled;
         }
@@ -345,35 +356,40 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
 
         private void RestoreInitialSettingsState()
         {
-            SettingsManager settingsManager = SettingsManager.Instance;
+            SettingsSession settingsManager = _session;
             settingsManager?.RestoreSavedSettings();
             _currentMusicVolume = _initialMusicVolume;
             _currentSfxVolume = _initialSfxVolume;
             _currentVibrationEnabled = _initialVibrationEnabled;
-            ApplyAudioState(_currentMusicVolume, _currentSfxVolume, animate: false);
-            ApplyVibrationState(_currentVibrationEnabled, animate: false);
+            musicSlider?.SetValueWithoutNotify(_currentMusicVolume);
+            sfxSlider?.SetValueWithoutNotify(_currentSfxVolume);
+            vibrationSlider?.SetValueWithoutNotify(_currentVibrationEnabled ? 1f : 0f);
+            RefreshMusicIcon(false);
+            RefreshSfxIcon(false);
+            RefreshVibrationIcon(false);
         }
 
-        private void CommitSettingsState()
+        private bool CommitSettingsState()
         {
-            SettingsManager settingsManager = SettingsManager.Instance;
+            SettingsSession settingsManager = _session;
             if (settingsManager == null)
             {
-                return;
+                return false;
             }
 
-            settingsManager.Save(_currentMusicVolume, _currentSfxVolume, _currentVibrationEnabled);
+            if (!settingsManager.Save(_currentMusicVolume, _currentSfxVolume, _currentVibrationEnabled)) return false;
             _initialMusicVolume = settingsManager.MusicVolume;
             _initialSfxVolume = settingsManager.SfxVolume;
             _initialVibrationEnabled = settingsManager.IsVibrationEnabled;
             _currentMusicVolume = _initialMusicVolume;
             _currentSfxVolume = _initialSfxVolume;
             _currentVibrationEnabled = _initialVibrationEnabled;
+            return true;
         }
 
         private void ApplyAudioRuntime(float musicValue, float sfxValue)
         {
-            SettingsManager settingsManager = SettingsManager.Instance;
+            SettingsSession settingsManager = _session;
             if (settingsManager == null)
             {
                 return;
@@ -388,7 +404,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
         {
             _currentMusicVolume = Mathf.Clamp01(value);
             RefreshMusicIcon(animate: true);
-            SettingsManager settingsManager = SettingsManager.Instance;
+            SettingsSession settingsManager = _session;
             if (settingsManager == null)
             {
                 return;
@@ -401,7 +417,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
         {
             _currentSfxVolume = Mathf.Clamp01(value);
             RefreshSfxIcon(animate: true);
-            SettingsManager settingsManager = SettingsManager.Instance;
+            SettingsSession settingsManager = _session;
             if (settingsManager == null)
             {
                 return;
@@ -428,8 +444,17 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             if (vibrationSlider != null && vibrationSlider.handleRect != null) vibrationSlider.handleRect.DOKill();
         }
 
-        private void OnDisable()
+        protected override void OnDisable()
         {
+            KillActiveTweens();
+            _isSliderPressed.Clear();
+            if (vibrationSlider != null) vibrationSlider.onValueChanged.RemoveListener(HandleVibrationSliderChanged);
+            if (sfxSlider != null) sfxSlider.onValueChanged.RemoveListener(HandleSfxSliderChanged);
+            if (musicSlider != null) musicSlider.onValueChanged.RemoveListener(HandleMusicSliderChanged);
+            if (btnClose != null) btnClose.onClick.RemoveListener(HandleClosePressed);
+            if (btnCancel != null) btnCancel.onClick.RemoveListener(HandleCancelPressed);
+            if (btnSave != null) btnSave.onClick.RemoveListener(HandleSavePressed);
+            base.OnDisable();
             if (!_hasActiveSession)
             {
                 return;
@@ -515,9 +540,11 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                 handle.DOKill();
                 handle.DOScale(1.0f, 0.25f).SetEase(Ease.OutBack).SetUpdate(true);
 
-                if (slider == sfxSlider && AudioController.Instance != null)
+                if (slider == sfxSlider)
                 {
-                    AudioController.Instance.PlayUISound(UISoundType.ClickNormal);
+                    var audio = AudioManager.Instance;
+                    if (audio?.Config is PawAudioConfig config)
+                        audio.PlaySfx(config.UiSfx.clickNormal);
                 }
             });
             trigger.triggers.Add(pointerUp);

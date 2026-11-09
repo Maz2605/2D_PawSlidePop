@@ -1,323 +1,78 @@
-using System.IO;
-using _PawSlidePopGame._Scripts.Core.Audio;
-using _PawSlidePopGame._Scripts.Core.Boostrap;
-using _PawSlidePopGame._Scripts.Core.System.DesignPattern.Singleton;
-using _PawSlidePopGame._Scripts.Core.Vibration;
-using _PawSlidePopGame._Scripts.Data.Events;
-using _PawSlidePopGame._Scripts.Data.SaveSystem;
-using _PawSlidePopGame.Scripts.DesignPattern.ObserverPattern;
+using System;
+using MazFramework.Audio;
+using MazFramework.Haptics;
 using UnityEngine;
+using BaseSettings = MazFramework.Settings.SettingsManager;
 
 namespace _PawSlidePopGame._Scripts.Core.System
 {
-    public sealed class SettingsManager : Singleton<SettingsManager>, IAppService
+    /// <summary>Preview/save/cancel for one popup opening, using the existing Base services directly.</summary>
+    public sealed class SettingsSession
     {
-        private const string SettingsFileName = "settings.json";
-
-        [Header("Defaults")]
-        [SerializeField] private float defaultMusicVolume = 1f;
-        [SerializeField] private float defaultSfxVolume = 1f;
-        [SerializeField] private bool defaultMusicEnabled = true;
-        [SerializeField] private bool defaultSfxEnabled = true;
-        [SerializeField] private bool defaultVibrationEnabled = true;
-
-        [Header("Runtime Debug")]
-        [SerializeField] private float musicVolume = 1f;
-        [SerializeField] private float sfxVolume = 1f;
-        [SerializeField] private bool musicEnabled = true;
-        [SerializeField] private bool sfxEnabled = true;
-        [SerializeField] private bool vibrationEnabled = true;
-        [SerializeField] private float previewMusicVolume = 1f;
-        [SerializeField] private float previewSfxVolume = 1f;
-        [SerializeField] private bool previewMusicEnabled = true;
-        [SerializeField] private bool previewSfxEnabled = true;
-        [SerializeField] private bool previewVibrationEnabled = true;
-
-        private bool _initialized;
-        private string _settingsFilePath;
-
-        public float MusicVolume
+        public bool IsAvailable => BaseSettings.Instance != null && BaseSettings.Instance.IsInitialized &&
+            AudioManager.ExistingInstance != null && AudioManager.ExistingInstance.IsInitialized &&
+            HapticManager.ExistingInstance != null && HapticManager.ExistingInstance.IsInitialized;
+        public float MusicVolume => BaseSettings.Instance == null ? 1f :
+            (BaseSettings.Instance.IsMusicEnabled ? BaseSettings.Instance.MusicVolume : 0f);
+        public float SfxVolume => BaseSettings.Instance == null ? 1f :
+            (BaseSettings.Instance.IsSfxEnabled ? BaseSettings.Instance.SfxVolume : 0f);
+        public bool IsVibrationEnabled => BaseSettings.Instance == null || BaseSettings.Instance.IsHapticsEnabled;
+        public void PreviewAudio(float music, float sfx)
         {
-            get
-            {
-                EnsureInitialized();
-                return musicVolume;
-            }
+            var audio = AudioManager.ExistingInstance;
+            if (audio == null) return;
+            music = Clamp(music);
+            sfx = Clamp(sfx);
+            audio.SetMusicVolume(music);
+            audio.SetSfxVolume(sfx);
+            audio.SetMusicEnabled(music > .001f);
+            audio.SetSfxEnabled(sfx > .001f);
         }
-
-        public float SfxVolume
-        {
-            get
-            {
-                EnsureInitialized();
-                return sfxVolume;
-            }
-        }
-
-        public bool IsMusicEnabled
-        {
-            get
-            {
-                EnsureInitialized();
-                return musicEnabled;
-            }
-        }
-
-        public bool IsSfxEnabled
-        {
-            get
-            {
-                EnsureInitialized();
-                return sfxEnabled;
-            }
-        }
-
-        public bool IsVibrationEnabled
-        {
-            get
-            {
-                EnsureInitialized();
-                return vibrationEnabled;
-            }
-        }
-
-        public void Init()
-        {
-            EnsureInitialized();
-        }
-
-        public void PreviewAudio(float musicValue, float sfxValue)
-        {
-            EnsureInitialized();
-
-            previewMusicVolume = Mathf.Clamp01(musicValue);
-            previewSfxVolume = Mathf.Clamp01(sfxValue);
-            previewMusicEnabled = previewMusicVolume > 0.001f;
-            previewSfxEnabled = previewSfxVolume > 0.001f;
-            ApplyAudioSettings(previewMusicVolume, previewSfxVolume, previewMusicEnabled, previewSfxEnabled);
-        }
-
         public void PreviewVibration(bool enabled, bool playFeedback = false)
         {
-            EnsureInitialized();
-
-            previewVibrationEnabled = enabled;
-            ApplyVibrationSettings(previewVibrationEnabled);
-
-            if (playFeedback && previewVibrationEnabled)
-            {
-                EventManager<FeedbackEvent>.Post(FeedbackEvent.VibrationPreviewRequested);
-            }
+            var haptics = HapticManager.ExistingInstance;
+            if (haptics == null) return;
+            haptics.SetEnabled(enabled);
+            if (enabled && playFeedback) haptics.PlaySelection();
         }
-
         public void RestoreSavedSettings()
         {
-            EnsureInitialized();
-            SyncPreviewWithSaved();
-            ApplySavedSettings();
+            BaseSettings.Instance?.ApplySettings();
         }
-
-        public void Save(float musicValue, float sfxValue, bool vibrationState)
+        public bool Save(float music, float sfx, bool vibration)
         {
-            EnsureInitialized();
-
-            musicVolume = Mathf.Clamp01(musicValue);
-            sfxVolume = Mathf.Clamp01(sfxValue);
-            musicEnabled = musicVolume > 0.001f;
-            sfxEnabled = sfxVolume > 0.001f;
-            vibrationEnabled = vibrationState;
-
-            SyncPreviewWithSaved();
-            ApplySavedSettings();
-            SaveSettingsFile();
-        }
-
-        private void LoadSettings()
-        {
-            SettingsSaveData loaded = LoadSettingsFile();
-            loaded.Sanitize(
-                defaultMusicVolume,
-                defaultSfxVolume,
-                defaultMusicEnabled,
-                defaultSfxEnabled,
-                defaultVibrationEnabled);
-
-            musicVolume = loaded.musicVolume;
-            sfxVolume = loaded.sfxVolume;
-            musicEnabled = loaded.musicEnabled;
-            sfxEnabled = loaded.sfxEnabled;
-            vibrationEnabled = loaded.vibrationEnabled;
-
-            SyncPreviewWithSaved();
-        }
-
-        private void EnsureInitialized()
-        {
-            if (_initialized)
+            if (float.IsNaN(music) || float.IsInfinity(music) || float.IsNaN(sfx) || float.IsInfinity(sfx)) return false;
+            if (!IsAvailable) return false;
+            music = Clamp(music);
+            sfx = Clamp(sfx);
+            var settings = BaseSettings.Instance;
+            float savedMusic = settings.MusicVolume;
+            float savedSfx = settings.SfxVolume;
+            bool savedMusicEnabled = settings.IsMusicEnabled;
+            bool savedSfxEnabled = settings.IsSfxEnabled;
+            bool savedHaptics = settings.IsHapticsEnabled;
+            try
             {
-                return;
+                settings.SetMusicVolume(music);
+                settings.SetSfxVolume(sfx);
+                settings.SetMusicEnabled(music > .001f);
+                settings.SetSfxEnabled(sfx > .001f);
+                settings.SetHapticsEnabled(vibration);
+                settings.Save();
+                return true;
             }
-
-            LoadSettings();
-            ApplySavedSettings();
-            _initialized = true;
-        }
-
-        private void SyncPreviewWithSaved()
-        {
-            previewMusicVolume = musicVolume;
-            previewSfxVolume = sfxVolume;
-            previewMusicEnabled = musicEnabled;
-            previewSfxEnabled = sfxEnabled;
-            previewVibrationEnabled = vibrationEnabled;
-        }
-
-        private void ApplySavedSettings()
-        {
-            ApplyAudioSettings(musicVolume, sfxVolume, musicEnabled, sfxEnabled);
-            ApplyVibrationSettings(vibrationEnabled);
-        }
-
-        private void ApplyAudioSettings(float targetMusicVolume, float targetSfxVolume, bool targetMusicEnabled, bool targetSfxEnabled)
-        {
-            AudioManager audioManager = AudioManager.Instance;
-            if (audioManager == null)
+            catch (Exception exception)
             {
-                return;
-            }
-
-            audioManager.SetMusicVolume(targetMusicVolume);
-            audioManager.SetMusicState(targetMusicEnabled);
-            audioManager.SetSfxVolume(targetSfxVolume);
-            audioManager.SetSfxState(targetSfxEnabled);
-        }
-
-        private void ApplyVibrationSettings(bool targetVibrationEnabled)
-        {
-            VibrationManager vibrationManager = VibrationManager.Instance;
-            if (vibrationManager == null)
-            {
-                return;
-            }
-
-            vibrationManager.SetVibrationEnabled(targetVibrationEnabled);
-        }
-
-        private SettingsSaveData LoadSettingsFile()
-        {
-            string filePath = GetSettingsFilePath();
-            return SaveSystem.LoadFromPath<SettingsSaveData>(filePath, useEncryption: false) ?? CreateDefaultSaveData();
-        }
-
-        private void SaveSettingsFile()
-        {
-            SettingsSaveData data = new SettingsSaveData
-            {
-                musicVolume = musicVolume,
-                sfxVolume = sfxVolume,
-                musicEnabled = musicEnabled,
-                sfxEnabled = sfxEnabled,
-                vibrationEnabled = vibrationEnabled
-            };
-
-            data.Sanitize(
-                defaultMusicVolume,
-                defaultSfxVolume,
-                defaultMusicEnabled,
-                defaultSfxEnabled,
-                defaultVibrationEnabled);
-
-            SaveSystem.SaveToPath(GetSettingsFilePath(), data, useEncryption: false);
-        }
-
-        private SettingsSaveData CreateDefaultSaveData()
-        {
-            SettingsSaveData data = new SettingsSaveData
-            {
-                musicVolume = defaultMusicEnabled ? Mathf.Clamp01(defaultMusicVolume) : 0f,
-                sfxVolume = defaultSfxEnabled ? Mathf.Clamp01(defaultSfxVolume) : 0f,
-                musicEnabled = defaultMusicEnabled && defaultMusicVolume > 0.001f,
-                sfxEnabled = defaultSfxEnabled && defaultSfxVolume > 0.001f,
-                vibrationEnabled = defaultVibrationEnabled
-            };
-
-            data.Sanitize(
-                defaultMusicVolume,
-                defaultSfxVolume,
-                defaultMusicEnabled,
-                defaultSfxEnabled,
-                defaultVibrationEnabled);
-
-            return data;
-        }
-
-        private string GetSettingsFilePath()
-        {
-            if (!string.IsNullOrEmpty(_settingsFilePath))
-            {
-                return _settingsFilePath;
-            }
-
-            _settingsFilePath = Path.Combine(Application.persistentDataPath, SettingsFileName);
-            return _settingsFilePath;
-        }
-    }
-
-    [global::System.Serializable]
-    public sealed class SettingsSaveData
-    {
-        public int schemaVersion = 1;
-        public float musicVolume = 1f;
-        public float sfxVolume = 1f;
-        public bool musicEnabled = true;
-        public bool sfxEnabled = true;
-        public bool vibrationEnabled = true;
-
-        public void Sanitize(
-            float defaultMusicVolume,
-            float defaultSfxVolume,
-            bool defaultMusicEnabled,
-            bool defaultSfxEnabled,
-            bool defaultVibrationEnabled)
-        {
-            schemaVersion = global::System.Math.Max(1, schemaVersion);
-
-            if (!defaultMusicEnabled)
-            {
-                musicEnabled = false;
-                musicVolume = 0f;
-            }
-            else
-            {
-                musicVolume = Mathf.Clamp01(musicVolume);
-                musicEnabled = musicEnabled && musicVolume > 0.001f;
-            }
-
-            if (!defaultSfxEnabled)
-            {
-                sfxEnabled = false;
-                sfxVolume = 0f;
-            }
-            else
-            {
-                sfxVolume = Mathf.Clamp01(sfxVolume);
-                sfxEnabled = sfxEnabled && sfxVolume > 0.001f;
-            }
-
-            if (!defaultVibrationEnabled)
-            {
-                vibrationEnabled = false;
-            }
-
-            if (!musicEnabled)
-            {
-                musicVolume = 0f;
-            }
-
-            if (!sfxEnabled)
-            {
-                sfxVolume = 0f;
+                settings.SetMusicVolume(savedMusic);
+                settings.SetSfxVolume(savedSfx);
+                settings.SetMusicEnabled(savedMusicEnabled);
+                settings.SetSfxEnabled(savedSfxEnabled);
+                settings.SetHapticsEnabled(savedHaptics);
+                settings.ApplySettings();
+                Debug.LogException(exception);
+                return false;
             }
         }
+        private static float Clamp(float value) => float.IsNaN(value) || float.IsInfinity(value) ? 0f : Math.Max(0f, Math.Min(1f, value));
     }
 }
