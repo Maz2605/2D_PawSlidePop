@@ -6,10 +6,10 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/_PawSlidePopGame/Scenes/LoadingScene.unity
+    path: Assets/_PawSlidePopGame/Content/Scenes/LoadingScene.unity
     guid: e3a1e30bd4e628d4db4d938821117446
   - enabled: 1
-    path: Assets/_PawSlidePopGame/Scenes/GameplayScene.unity
+    path: Assets/_PawSlidePopGame/Content/Scenes/GameplayScene.unity
     guid: 8c9cfa26abfee488c85f1582747f6a02
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}

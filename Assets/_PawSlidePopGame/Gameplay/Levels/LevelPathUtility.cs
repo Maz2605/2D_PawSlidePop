@@ -6,7 +6,7 @@ namespace _PawSlidePopGame._Scripts.Data.LevelProvider
     public static class LevelPathUtility
     {
         public const string ResourcesLevelsFolder = "Levels";
-        public const string AssetLevelsFolder = "Assets/Resources/Levels";
+        public const string AssetLevelsFolder = "Assets/_PawSlidePopGame/Content/Shared/Resources/Levels";
 
         public static string SanitizeLevelId(string levelId)
         {
