@@ -1,97 +1,72 @@
+using System.Collections;
 using _PawSlidePopGame._Scripts.Core.System.GameFlow;
-using _PawSlidePopGame._Scripts.Core.Vibration;
-using _PawSlidePopGame._Scripts.Data.Events;
 using _PawSlidePopGame._Scripts.Data.Events.Payloads;
-using _PawSlidePopGame._Scripts.Feature.Match3.Flow;
-using _PawSlidePopGame._Scripts.Feature.Match3.Presenter;
 using _PawSlidePopGame._Scripts.Feature.Match3.View;
-using _PawSlidePopGame._Scripts.Gameplay.Meta.MapManager;
-using _PawSlidePopGame._Scripts.UI.Manager;
 using _PawSlidePopGame._Scripts.UI.Popups;
-using _PawSlidePopGame.Scripts.DesignPattern.ObserverPattern;
+using MazFramework.UI;
 using UnityEngine;
 
 namespace _PawSlidePopGame._Scripts.UI.Screens.Gameplay
 {
     public sealed class GameplayResultPopupPresenter : MonoBehaviour
     {
+        private GameAppFlowManager _app;
+        private GameplayScreen _screen;
+        private Coroutine _pending;
+        private int _version;
         private void OnEnable()
         {
-            EventManager<LogicGameEvent>.AddListener<GameplayHudSnapshot>(LogicGameEvent.GameplayWon, HandleGameplayWon);
-            EventManager<LogicGameEvent>.AddListener<GameplayHudSnapshot>(LogicGameEvent.GameplayLost, HandleGameplayLost);
+            _screen = GetComponent<GameplayScreen>();
+            if (_screen != null) _screen.HidingStarted += CancelPending;
+            Bind();
         }
-
+        private void LateUpdate()
+        {
+            if (_app != GameAppFlowManager.ExistingInstance) Bind();
+        }
+        private void Bind()
+        {
+            Unbind();
+            _app = GameAppFlowManager.ExistingInstance;
+            if (_app == null) return;
+            _app.ResultReady += HandleResult;
+            _app.SessionChanged += HandleSessionChanged;
+        }
+        private void Unbind()
+        {
+            if (_app == null) return;
+            _app.ResultReady -= HandleResult;
+            _app.SessionChanged -= HandleSessionChanged;
+            _app = null;
+        }
+        private void HandleSessionChanged(long sessionId) => CancelPending();
+        private void HandleResult(long sessionId, bool won, GameplayHudSnapshot snapshot)
+        {
+            CancelPending();
+            if (_app == null || sessionId <= 0 || sessionId != _app.CurrentSessionId || snapshot == null) return;
+            float delay = won ? 0f : (Match3BoardView.Instance != null ? Match3BoardView.Instance.LoseOutroDelayBeforePopup : 1.8f);
+            _pending = StartCoroutine(ShowResult(sessionId, won, snapshot.Clone(), delay, _version));
+        }
+        private IEnumerator ShowResult(long sessionId, bool won, GameplayHudSnapshot snapshot, float delay, int version)
+        {
+            if (delay > 0f) yield return new WaitForSeconds(delay);
+            if (version != _version || !isActiveAndEnabled || _app == null ||
+                sessionId != _app.CurrentSessionId || (_screen != null && !_screen.IsVisible)) yield break;
+            _pending = null;
+            if (won) UIManager.Instance?.ShowPopup<WinPopup>(popup => popup.SetSnapshot(snapshot));
+            else UIManager.Instance?.ShowPopup<LosePopup>(popup => popup.SetSnapshot(snapshot));
+        }
+        private void CancelPending()
+        {
+            _version++;
+            if (_pending != null) StopCoroutine(_pending);
+            _pending = null;
+        }
         private void OnDisable()
         {
-            EventManager<LogicGameEvent>.RemoveListener<GameplayHudSnapshot>(LogicGameEvent.GameplayWon, HandleGameplayWon);
-            EventManager<LogicGameEvent>.RemoveListener<GameplayHudSnapshot>(LogicGameEvent.GameplayLost, HandleGameplayLost);
-        }
-
-        private void HandleGameplayWon(GameplayHudSnapshot snapshot)
-        {
-            StartCoroutine(ShowWinPopupDelayed(snapshot));
-        }
-
-        private System.Collections.IEnumerator ShowWinPopupDelayed(GameplayHudSnapshot snapshot)
-        {
-            var boardPresenter = Match3BoardPresenter.Instance;
-            if (boardPresenter != null)
-            {
-                yield return new WaitUntil(() => !boardPresenter.IsVictoryOutroPlaying);
-            }
-
-            GameplayHudSnapshot resolvedSnapshot = GameFlowManager.Instance?.LastSnapshot?.Clone() ?? snapshot?.Clone();
-            if (resolvedSnapshot == null)
-            {
-                Debug.LogWarning("[GameplayResultPopupPresenter] Missing GameplayHudSnapshot for WinPopup.");
-                yield break;
-            }
-
-            RecordLevelProgress(resolvedSnapshot);
-            UIManager.Instance?.ShowPopup<WinPopup>(
-                popup => popup.SetSnapshot(resolvedSnapshot));
-        }
-
-        private void HandleGameplayLost(GameplayHudSnapshot snapshot)
-        {
-            GameplayHudSnapshot resolvedSnapshot = snapshot?.Clone() ?? GameFlowManager.Instance?.LastSnapshot?.Clone();
-            if (resolvedSnapshot == null)
-            {
-                Debug.LogWarning("[GameplayResultPopupPresenter] Missing GameplayHudSnapshot for LosePopup.");
-                return;
-            }
-
-            float delay = 1.8f;
-            var boardView = Match3BoardView.Instance;
-            if (boardView != null)
-            {
-                delay = boardView.LoseOutroDelayBeforePopup;
-            }
-
-            StartCoroutine(ShowLosePopupDelayed(resolvedSnapshot, delay));
-        }
-
-        private System.Collections.IEnumerator ShowLosePopupDelayed(GameplayHudSnapshot snapshot, float delay)
-        {
-            if (delay > 0f)
-            {
-                yield return new WaitForSeconds(delay);
-            }
-
-            UIManager.Instance?.ShowPopup<LosePopup>(
-                popup => popup.SetSnapshot(snapshot));
-        }
-
-        private static void RecordLevelProgress(GameplayHudSnapshot snapshot)
-        {
-            string levelId = GameAppFlowManager.Instance != null ? GameAppFlowManager.Instance.CurrentLevelId : null;
-            if (string.IsNullOrWhiteSpace(levelId))
-            {
-                Debug.LogWarning("[GameplayResultPopupPresenter] Cannot save level progress because CurrentLevelId is empty.");
-                return;
-            }
-
-            LevelProgressRepository.Instance.RecordWinAndAdvance(levelId, snapshot.reachedStars, snapshot.currentScore);
+            CancelPending();
+            if (_screen != null) _screen.HidingStarted -= CancelPending;
+            Unbind();
         }
     }
 }

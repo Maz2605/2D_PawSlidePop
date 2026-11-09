@@ -1,17 +1,20 @@
+using MazFramework.Audio;
+using MazFramework.Haptics;
+using PawAudioConfig = _PawSlidePopGame._Scripts.Data.Config.PawSlidePopAudioConfig;
 using System;
 using System.Collections.Generic;
-using _PawSlidePopGame._Scripts.Core.System.DesignPattern.Singleton;
+using MazFramework.Foundation.Singleton;
 using _PawSlidePopGame._Scripts.Data.Events;
 using _PawSlidePopGame._Scripts.Data.Events.Payloads;
 using _PawSlidePopGame._Scripts.Feature.Match3.Boosters;
 using _PawSlidePopGame._Scripts.Feature.Match3.Flow;
 using _PawSlidePopGame._Scripts.Feature.Match3.Presenter;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.MapManager;
-using _PawSlidePopGame._Scripts.UI.Manager;
+using MazFramework.UI;
 using _PawSlidePopGame._Scripts.UI.Popups;
 using _PawSlidePopGame._Scripts.UI.Screens;
 using _PawSlidePopGame._Scripts.UI.Screens.Gameplay;
-using _PawSlidePopGame.Scripts.DesignPattern.ObserverPattern;
+using MazFramework.Foundation.Events;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.EconomyManager;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -32,6 +35,111 @@ namespace _PawSlidePopGame._Scripts.Core.System.GameFlow
         private Match3BoardPresenter _boardPresenter;
         private Transform _gameplaySessionRoot;
         private bool _hasShownStartScreen;
+        // Keep IDs unique even if this owner is recreated while the persistent UI remains alive.
+        private static long _nextSessionId;
+        private bool _changingSession;
+        private bool _resultPublished;
+        private bool _exitingSession;
+        private string _resultLevelId;
+        private bool _resultCommitted;
+        private bool _committingResult;
+        public long CurrentSessionId { get; private set; }
+        public event Action<long> SessionChanged;
+        public event Action<long, bool, GameplayHudSnapshot> ResultReady;
+        private bool TryCommitWin(long sessionId, GameplayHudSnapshot snapshot)
+        {
+            if (sessionId <= 0 || sessionId != CurrentSessionId || snapshot == null || _committingResult) return false;
+            if (_resultCommitted) return true;
+            _committingResult = true;
+            try
+            {
+                if (!LevelProgressRepository.Instance.TryRecordWinAndAdvance(
+                    _resultLevelId, snapshot.reachedStars, snapshot.currentScore)) return false;
+                if (sessionId != CurrentSessionId) return false;
+                _resultCommitted = true;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+                return false;
+            }
+            finally { _committingResult = false; }
+        }
+
+        private bool PublishFinalResult(long sessionId, bool won, GameplayHudSnapshot snapshot)
+        {
+            if (sessionId != CurrentSessionId || sessionId == 0 || snapshot == null) return false;
+            bool persisted = !won || TryCommitWin(sessionId, snapshot);
+            if (!persisted)
+            {
+                Debug.LogError("[GameAppFlowManager] Cannot save result for session " + sessionId + " / " + CurrentLevelId, this);
+                UIManager.Instance?.ShowToast("Could not save the result. Please try again.");
+            }
+            PresentFinalResult(sessionId, won, snapshot);
+            return persisted;
+        }
+
+        private void PresentFinalResult(long sessionId, bool won, GameplayHudSnapshot snapshot)
+        {
+            if (!_resultPublished && !_exitingSession && sessionId == CurrentSessionId && snapshot != null)
+            {
+                _resultPublished = true;
+                ResultReady?.Invoke(sessionId, won, snapshot.Clone());
+            }
+        }
+
+        // Result buttons remain available after a failed write; each navigation attempt retries safely.
+        public bool TryCommitCurrentResult()
+        {
+            if (CurrentSessionId == 0 || _gameFlowManager == null || !_gameFlowManager.IsResultFinalized) return true;
+            return PublishFinalResult(CurrentSessionId, _gameFlowManager.ResultWon, _gameFlowManager.LastSnapshot);
+        }
+        private void HandleResultFinalized(long sessionId, bool won, GameplayHudSnapshot snapshot) =>
+            PublishFinalResult(sessionId, won, snapshot);
+
+        public bool TryExitGameplaySession()
+        {
+            if (_changingSession) return false;
+            _changingSession = true;
+            _exitingSession = true;
+            try
+            {
+                var sessionId = CurrentSessionId;
+                if (sessionId != 0 && _gameFlowManager != null &&
+                    _gameFlowManager.CurrentInGameSubState == InGameSubState.Victory)
+                {
+                    if (!_gameFlowManager.IsResultFinalized &&
+                        (_boardPresenter == null || !_boardPresenter.TryCompleteVictoryImmediately(sessionId)))
+                    {
+                        Debug.LogError("[GameAppFlowManager] Victory could not be finalized; navigation canceled.", this);
+                        return false;
+                    }
+                    if (!PublishFinalResult(sessionId, true, _gameFlowManager.LastSnapshot)) return false;
+                }
+                if (_gameFlowManager != null) _gameFlowManager.ResultFinalized -= HandleResultFinalized;
+                _resultLevelId = null;
+                _resultCommitted = false;
+                CurrentSessionId = 0;
+                SessionChanged?.Invoke(0);
+                ExitGameplaySessionCore();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception, this);
+                UIManager.Instance?.ShowToast("Could not finish the result. Please try again.");
+                return false;
+            }
+            finally
+            {
+                _exitingSession = false;
+                _changingSession = false;
+                // A failed early-exit write must still expose result buttons for a safe retry.
+                if (CurrentSessionId != 0 && _gameFlowManager != null && _gameFlowManager.IsResultFinalized)
+                    PresentFinalResult(CurrentSessionId, _gameFlowManager.ResultWon, _gameFlowManager.LastSnapshot);
+            }
+        }
 
         public GameAppState CurrentAppState { get; private set; } = GameAppState.None;
         public string CurrentLevelId { get; private set; }
@@ -58,6 +166,8 @@ namespace _PawSlidePopGame._Scripts.Core.System.GameFlow
 
             SetAppState(GameAppState.Bootstrapping);
             TryResolveGameplayFlowManager();
+            // Direct Editor entry initializes after sceneLoaded; handle the current scene too.
+            HandleSceneLoaded(SceneManager.GetActiveScene(), LoadSceneMode.Single);
         }
 
         public void EnterMainMenu()
@@ -67,7 +177,7 @@ namespace _PawSlidePopGame._Scripts.Core.System.GameFlow
                 return;
             }
 
-            ExitGameplaySession();
+            if (!TryExitGameplaySession()) return;
             UIManager.Instance.ClearAllPopups();
             UIManager.Instance.ShowScreen<GameMenuScreen>();
             SetAppState(GameAppState.MainMenu);
@@ -75,7 +185,7 @@ namespace _PawSlidePopGame._Scripts.Core.System.GameFlow
 
         public bool StartGameplaySession(string levelId = null, IReadOnlyList<BoosterDefinitionSO> preLevelBoosters = null)
         {
-            if (CurrentAppState == GameAppState.EnteringGameplay)
+            if (_changingSession || CurrentAppState == GameAppState.EnteringGameplay)
             {
                 return false;
             }
@@ -108,9 +218,9 @@ namespace _PawSlidePopGame._Scripts.Core.System.GameFlow
                 return false;
             }
 
-            CurrentLevelId = string.IsNullOrWhiteSpace(levelId) ? tempLevelId : levelId;
-
-            ExitGameplaySession();
+            string requestedLevel = string.IsNullOrWhiteSpace(levelId) ? tempLevelId : levelId;
+            if (!TryExitGameplaySession()) return false;
+            CurrentLevelId = requestedLevel;
             if (!TryResolveLevelManager())
             {
                 Debug.LogError("[GameAppFlowManager] Missing Match3LevelManager in active scene.", this);
@@ -129,6 +239,14 @@ namespace _PawSlidePopGame._Scripts.Core.System.GameFlow
 
             HeartManager.Instance.SetMatchStarted();
 
+            CurrentSessionId = ++_nextSessionId;
+            _resultPublished = false;
+            _resultLevelId = CurrentLevelId;
+            _resultCommitted = false;
+            _gameFlowManager.BindSession(CurrentSessionId);
+            _gameFlowManager.ResultFinalized -= HandleResultFinalized;
+            _gameFlowManager.ResultFinalized += HandleResultFinalized;
+            SessionChanged?.Invoke(CurrentSessionId);
             SetAppState(GameAppState.EnteringGameplay);
             SetGameplaySessionActive(true);
             UIManager.Instance.ClearAllPopups();
@@ -183,7 +301,9 @@ namespace _PawSlidePopGame._Scripts.Core.System.GameFlow
             return true;
         }
 
-        public void ExitGameplaySession()
+        public void ExitGameplaySession() => TryExitGameplaySession();
+
+        private void ExitGameplaySessionCore()
         {
             TryResolveGameplayFlowManager();
             TryResolveGameplaySessionRoot();
@@ -212,6 +332,7 @@ namespace _PawSlidePopGame._Scripts.Core.System.GameFlow
 
         public void StartNextLevel()
         {
+            if (!TryCommitCurrentResult()) return;
             string nextLevelId = GetNextLevelId(CurrentLevelId);
 
             if (TryResolveLevelManager())
@@ -250,6 +371,10 @@ namespace _PawSlidePopGame._Scripts.Core.System.GameFlow
 
         protected override void OnDestroy()
         {
+            if (_gameFlowManager != null) _gameFlowManager.ResultFinalized -= HandleResultFinalized;
+            CurrentSessionId = 0;
+            _resultLevelId = null;
+            _resultCommitted = false;
             if (_isInitialized)
             {
                 SceneManager.sceneLoaded -= HandleSceneLoaded;
@@ -289,7 +414,7 @@ namespace _PawSlidePopGame._Scripts.Core.System.GameFlow
                 return;
             }
 
-            ExitGameplaySession();
+            if (!TryExitGameplaySession()) return;
             UIManager.Instance.ClearAllPopups();
             UIManager.Instance.ShowScreen<StartScreen>();
             SetAppState(GameAppState.MainMenu);
@@ -397,6 +522,23 @@ namespace _PawSlidePopGame._Scripts.Core.System.GameFlow
 
             GameAppState previousState = CurrentAppState;
             CurrentAppState = nextState;
+            var audio = AudioManager.ExistingInstance;
+            if (audio?.Config is PawAudioConfig config)
+            {
+                switch (nextState)
+                {
+                    case GameAppState.Bootstrapping:
+                    case GameAppState.MainMenu:
+                        audio.PlayMusic(config.Music.mainMenuBackground);
+                        break;
+                    case GameAppState.EnteringGameplay:
+                        audio.PlayMusic(config.Music.gameplayBackground);
+                        break;
+                    case GameAppState.Gameplay when previousState == GameAppState.EnteringGameplay:
+                        audio.PlaySfx(config.Match3Sfx.levelStart);
+                        break;
+                }
+            }
             EventManager<LogicGameEvent>.Post(
                 LogicGameEvent.GameAppStateChanged,
                 new GameAppStateChangedPayload(previousState, CurrentAppState));

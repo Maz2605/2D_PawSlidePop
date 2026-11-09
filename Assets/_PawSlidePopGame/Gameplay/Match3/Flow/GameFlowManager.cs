@@ -1,6 +1,9 @@
+using MazFramework.Audio;
+using MazFramework.Haptics;
+using PawAudioConfig = _PawSlidePopGame._Scripts.Data.Config.PawSlidePopAudioConfig;
 using System;
 using System.Collections.Generic;
-using _PawSlidePopGame._Scripts.Core.System.DesignPattern.Singleton;
+using MazFramework.Foundation.Singleton;
 using _PawSlidePopGame._Scripts.Core.System.GameFlow;
 using _PawSlidePopGame._Scripts.Data.Events;
 using _PawSlidePopGame._Scripts.Data.Events.Payloads;
@@ -12,7 +15,7 @@ using _PawSlidePopGame._Scripts.Feature.Match3.Model.Board;
 using _PawSlidePopGame._Scripts.Feature.Match3.Presentation;
 using _PawSlidePopGame._Scripts.Feature.Match3.Presenter;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.EconomyManager;
-using _PawSlidePopGame.Scripts.DesignPattern.ObserverPattern;
+using MazFramework.Foundation.Events;
 using UnityEngine;
 
 namespace _PawSlidePopGame._Scripts.Feature.Match3.Flow
@@ -33,6 +36,27 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Flow
         public InGameSubState CurrentInGameSubState { get; private set; } = InGameSubState.None;
         public GameplayHudSnapshot LastSnapshot => _lastSnapshot;
         public event Action<BoardMoveExecutionResult> OnAutoShuffleTriggered;
+        public long SessionId { get; private set; }
+        public bool IsResultFinalized { get; private set; }
+        public bool ResultWon { get; private set; }
+        public event Action<long, bool, GameplayHudSnapshot> ResultFinalized;
+        public void BindSession(long sessionId)
+        {
+            SessionId = sessionId;
+            IsResultFinalized = false;
+            ResultWon = false;
+        }
+        public bool FinalizeResult(long sessionId, bool won)
+        {
+            if (sessionId <= 0 || sessionId != SessionId) return false;
+            if (IsResultFinalized) return ResultWon == won;
+            ReconcileRuntimeSnapshot();
+            if (_lastSnapshot == null) return false;
+            IsResultFinalized = true;
+            ResultWon = won;
+            ResultFinalized?.Invoke(sessionId, won, _lastSnapshot.Clone());
+            return true;
+        }
 
         public bool CanAcceptGameplayCommands =>
             CurrentGameState == GameState.Gameplay &&
@@ -85,6 +109,7 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Flow
 
         public void ExitGameplay()
         {
+            BindSession(0);
             _chargedComboSource = null;
             _objectiveTracker = null;
             _chargedAbilityTracker = null;
@@ -439,6 +464,11 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Flow
             }
 
             UpdateSnapshotTargetProgress(targetChange);
+            {
+                var audio = AudioManager.Instance;
+                if (audio?.Config is PawAudioConfig config)
+                    audio.PlaySfx(config.Match3Sfx.targetCollected);
+            }
             EventManager<VisualGameEvent>.Post(VisualGameEvent.TopHudTargetProgressFx, targetChange);
             EventManager<VisualGameEvent>.Post(
                 VisualGameEvent.TopHudTargetCollectedFx,
@@ -454,6 +484,11 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Flow
 
             if (_objectiveTracker.TryConsumeTargetsCompletedFx())
             {
+                {
+                    var audio = AudioManager.Instance;
+                    if (audio?.Config is PawAudioConfig config)
+                        audio.PlaySfx(config.Match3Sfx.objectiveCompleted);
+                }
                 EventManager<VisualGameEvent>.Post(VisualGameEvent.TopHudTargetsCompletedFx);
             }
         }
@@ -472,6 +507,14 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Flow
             }
 
             _lastSnapshot.currentScore = scoreGainOp.RunningScore;
+            var audio = AudioManager.Instance;
+            if (scoreGainOp.Amount > 0 && audio?.Config is PawAudioConfig config)
+            {
+                AudioClip clip = scoreGainOp.Amount >= config.comboScoreThreshold ? config.Match3Sfx.combo
+                    : scoreGainOp.Amount >= config.bigMatchScoreThreshold ? config.Match3Sfx.matchBig
+                    : config.Match3Sfx.matchBasic;
+                audio.PlaySfx(clip, cooldown: config.matchSfxCooldown, cooldownKey: "Paw.Match");
+            }
             EventManager<LogicGameEvent>.Post(
                 LogicGameEvent.GameplayScoreChanged,
                 new ScoreChangedPayload(previousScore, _lastSnapshot.currentScore, scoreGainOp.Amount));
@@ -541,6 +584,7 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Flow
 
         public void EnterVictory()
         {
+            if (CurrentGameState == GameState.Result) return;
             SetGameState(GameState.Result);
             SetInGameSubState(InGameSubState.Victory);
             HeartManager.Instance.SetMatchFinished(true);
@@ -549,10 +593,12 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Flow
 
         public void EnterDefeat()
         {
+            if (CurrentGameState == GameState.Result) return;
             SetGameState(GameState.Result);
             SetInGameSubState(InGameSubState.Defeat);
             HeartManager.Instance.SetMatchFinished(false);
             EventManager<LogicGameEvent>.Post(LogicGameEvent.GameplayLost, _lastSnapshot?.Clone());
+            FinalizeResult(SessionId, false);
         }
 
         private void EnterPlayerTurn()

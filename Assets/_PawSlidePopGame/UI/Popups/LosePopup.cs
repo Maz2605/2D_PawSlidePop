@@ -1,9 +1,10 @@
+using MazFramework.Audio;
+using MazFramework.Haptics;
+using PawAudioConfig = _PawSlidePopGame._Scripts.Data.Config.PawSlidePopAudioConfig;
 using System;
-using _PawSlidePopGame._Scripts.Core.Audio;
-using _PawSlidePopGame._Scripts.Core.Vibration;
 using _PawSlidePopGame._Scripts.Core.System.GameFlow;
 using _PawSlidePopGame._Scripts.Data.Events.Payloads;
-using _PawSlidePopGame._Scripts.UI.Base;
+using MazFramework.UI;
 using _PawSlidePopGame._Scripts.UI.Components.Popup;
 using DG.Tweening;
 using UnityEngine;
@@ -41,21 +42,27 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             _snapshot = snapshot?.Clone();
         }
 
-        protected override UISoundType OpenSound => UISoundType.None;
-        protected override UISoundType CloseSound => UISoundType.None;
+
+        public override bool TryHandleBack()
+        {
+            return true;
+        }
 
         protected override void OnBeforeShow()
         {
             base.OnBeforeShow();
 
-            if (AudioController.Instance != null)
+            var audio = AudioManager.Instance;
+            if (audio?.Config is PawAudioConfig config)
             {
-                AudioController.Instance.PlayLoseMusic();
-                AudioController.Instance.PlayLevelLose();
+                var resultMusic = config.Music.resultLoseBackground;
+                if (resultMusic != null) audio.PlayMusic(resultMusic);
+                else audio.StopMusic(.25f);
+                audio.PlaySfx(config.Match3Sfx.levelLose);
             }
-            if (VibrationManager.Instance != null)
+            if (MazFramework.Haptics.HapticManager.Instance != null)
             {
-                VibrationManager.Instance.PlayLose();
+                MazFramework.Haptics.HapticManager.Instance.PlayFailure();
             }
 
             KillActiveTweens();
@@ -71,7 +78,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             BindButtons();
         }
 
-        protected override void PlayShowAnimation()
+        protected override Tween CreateShowTween(CanvasGroup group, float duration)
         {
             _showSequence = DOTween.Sequence()
                 .SetUpdate(true)
@@ -101,10 +108,12 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                 _showSequence.Append(buttonsElement.DoPopUp());
             }
 
-            _showSequence.OnComplete(() => SetButtonsInteractable(true));
+            _showSequence.AppendCallback(() => SetButtonsInteractable(true));
+            _showSequence.Insert(0f, group.DOFade(1f, ShowDuration));
+            return _showSequence;
         }
 
-        protected override void PlayHideAnimation(Action onComplete)
+        protected override Tween CreateHideTween(CanvasGroup group, float duration)
         {
             KillActiveTweens();
 
@@ -114,9 +123,10 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                 .SetUpdate(true)
                 .SetLink(gameObject, LinkBehaviour.KillOnDisable);
 
-            hideSequence.Join(canvasGroup.DOFade(0f, 0.2f));
+            hideSequence.Join(CanvasGroup.DOFade(0f, 0.2f));
             hideSequence.Join(animationTarget.DOScale(0.95f, 0.2f).SetEase(Ease.InQuad));
-            hideSequence.OnComplete(() => onComplete?.Invoke());
+            
+            return hideSequence;
         }
 
         #region Helpers
@@ -124,8 +134,8 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
         private void BindButtons()
         {
             SetButtonsInteractable(false);
-            BindButton(homeButton, HandleHomePressed);
-            BindButton(repeatButton, HandleRepeatPressed);
+            if (homeButton != null) { homeButton.onClick.RemoveListener(HandleHomePressed); homeButton.onClick.AddListener(HandleHomePressed); }
+            if (repeatButton != null) { repeatButton.onClick.RemoveListener(HandleRepeatPressed); repeatButton.onClick.AddListener(HandleRepeatPressed); }
         }
 
         private void SetButtonsInteractable(bool enabled)
@@ -192,5 +202,11 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
         }
 
         #endregion
+        protected override void OnDisable()
+        {
+            if (homeButton != null) homeButton.onClick.RemoveListener(HandleHomePressed);
+            if (repeatButton != null) repeatButton.onClick.RemoveListener(HandleRepeatPressed);
+            base.OnDisable();
+        }
     }
 }

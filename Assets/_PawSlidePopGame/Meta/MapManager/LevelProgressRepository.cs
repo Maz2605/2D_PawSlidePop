@@ -1,6 +1,6 @@
 using System;
 using _PawSlidePopGame._Scripts.Data.LevelProvider;
-using _PawSlidePopGame._Scripts.Data.SaveSystem;
+using MazFramework.Persistence;
 
 namespace _PawSlidePopGame._Scripts.Gameplay.Meta.MapManager
 {
@@ -13,6 +13,7 @@ namespace _PawSlidePopGame._Scripts.Gameplay.Meta.MapManager
 
         private readonly string _saveKey;
         private LevelProgressSaveData _data;
+        private bool _deferSave;
 
         public static event Action OnDataChanged;
 
@@ -210,8 +211,32 @@ namespace _PawSlidePopGame._Scripts.Gameplay.Meta.MapManager
             return changed;
         }
 
+        public bool TryRecordWinAndAdvance(string levelId, int reachedStars, int score)
+        {
+            if (string.IsNullOrWhiteSpace(LevelPathUtility.SanitizeLevelId(levelId))) return false;
+            LevelProgressSaveData original = Data;
+            // Work on a detached copy so a failed disk write cannot leave an unlocked level in memory.
+            _data = Newtonsoft.Json.JsonConvert.DeserializeObject<LevelProgressSaveData>(
+                Newtonsoft.Json.JsonConvert.SerializeObject(original));
+            try
+            {
+                _deferSave = true;
+                RecordWinAndAdvance(levelId, reachedStars, score);
+                _deferSave = false;
+                _data.Sanitize();
+                if (!SaveSystem.TrySave(_saveKey, _data)) { _data = original; return false; }
+            }
+            catch { _data = original; throw; }
+            finally { _deferSave = false; }
+            if (OnDataChanged != null)
+                foreach (Action callback in OnDataChanged.GetInvocationList())
+                    try { callback(); } catch (Exception e) { UnityEngine.Debug.LogException(e); }
+            return true;
+        }
+
         public void Save()
         {
+            if (_deferSave) return;
             Data.Sanitize();
             SaveSystem.Save(_saveKey, Data);
             OnDataChanged?.Invoke();
