@@ -1,15 +1,15 @@
-﻿#if UNITY_EDITOR
+#if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
-namespace _PawSlidePopGame._Scripts.Utils.DevTest
+namespace _PawSlidePopGame._Scripts.Utils.Editor
 {
     
     public class SceneSwitcherWindow : EditorWindow
     {
-        private const string GameScenePath = "Assets/_PawSlidePopGame/Scenes/GameplayScene.unity";
-        private const string EditorScenePath = "Assets/_PawSlidePopGame/Scenes/EditorScene.unity";
+        private const string GameScenePath = "Assets/_PawSlidePopGame/Content/Scenes/GameplayScene.unity";
+        private const string EditorScenePath = "Assets/_PawSlidePopGame/Content/Scenes/EditorScene.unity";
 
         [MenuItem("Tools/Fast Scene Switcher Window")]
         public static void ShowWindow()

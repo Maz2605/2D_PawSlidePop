@@ -16,7 +16,7 @@ namespace _PawSlidePopGame._Scripts.Feature.LevelEditor.Temporary
         [MenuItem("Tools/Paw Slide Pop/Level Editor/Generate All Levels (1-36)")]
         public static void GenerateAll()
         {
-            Match3TileDatabaseSO database = AssetDatabase.LoadAssetAtPath<Match3TileDatabaseSO>("Assets/_PawSlidePopGame/_Data/Tiles/Database.asset");
+            Match3TileDatabaseSO database = AssetDatabase.LoadAssetAtPath<Match3TileDatabaseSO>("Assets/_PawSlidePopGame/Content/Data/Tiles/Database.asset");
             if (database == null)
             {
                 Debug.LogError("[LevelEditor] Tile database asset not found.");

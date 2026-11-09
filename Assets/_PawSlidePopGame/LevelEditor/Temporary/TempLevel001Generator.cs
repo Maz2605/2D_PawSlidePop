@@ -14,7 +14,7 @@ namespace _PawSlidePopGame._Scripts.Feature.LevelEditor.Temporary
         [MenuItem("Tools/Paw Slide Pop/Level Editor/Generate Temp Level 001")]
         public static void GenerateMenu()
         {
-            Match3TileDatabaseSO database = AssetDatabase.LoadAssetAtPath<Match3TileDatabaseSO>("Assets/_PawSlidePopGame/_Data/Tiles/Database.asset");
+            Match3TileDatabaseSO database = AssetDatabase.LoadAssetAtPath<Match3TileDatabaseSO>("Assets/_PawSlidePopGame/Content/Data/Tiles/Database.asset");
             if (database == null)
             {
                 Debug.LogError("[LevelEditor] Tile database asset not found.");
