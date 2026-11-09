@@ -1,6 +1,6 @@
 param(
-    [string]$InputFile = "Docs/game-flow.mmd",
-    [string]$OutputFile = "Docs/game-flow.png",
+    [string]$InputFile = "Assets/_PawSlidePopGame/Docs/game-flow.mmd",
+    [string]$OutputFile = "Assets/_PawSlidePopGame/Docs/game-flow.png",
     [string]$BackgroundColor = "white"
 )
 

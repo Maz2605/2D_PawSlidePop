@@ -1,0 +1,14 @@
+flowchart TD
+    Loading[LoadingScene / Editor auto bootstrap] --> Migration[Legacy settings migration]
+    Migration --> Base[Device / Audio / Haptics / Settings / UI / Overlays]
+    Base --> Ready{Base Ready?}
+    Ready -->|yes| SDK[Start optional SDK adapters]
+    Ready -->|no| Error[Report startup configuration error]
+    SDK --> Main[Main menu]
+    Main --> Hearts{Can start session?}
+    Hearts -->|yes| Play[Match-3 session]
+    Play --> Resolve[Match / Blocker / Gravity / Refill]
+    Resolve --> Play
+    Play --> Result[Win / Lose]
+    Result --> Meta[Commit progression and rewards]
+    Meta --> Main
