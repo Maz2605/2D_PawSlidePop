@@ -1,14 +1,15 @@
 using System;
+using System.Collections.Generic;
+using MazFramework.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
-using _PawSlidePopGame._Scripts.UI.Base;
+using MazFramework.UI;
 using _PawSlidePopGame._Scripts.Services.Auth;
 using _PawSlidePopGame._Scripts.Services.Save;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.EconomyManager;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.MapManager;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.Inventory;
-using _PawSlidePopGame._Scripts.UI.Manager;
-using _PawSlidePopGame._Scripts.Data.SaveSystem;
+using MazFramework.Persistence;
 using _PawSlidePopGame._Scripts.UI.Components;
 using DG.Tweening;
 using TMPro;
@@ -78,6 +79,63 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
         // Lifecycle
         // ──────────────────────────────────────────────────────────
 
+        private sealed class AuthRequest
+        {
+            public int ViewVersion;
+            public LoadingHandle Loading;
+            public bool Completed;
+        }
+
+        private readonly HashSet<AuthRequest> _authRequests = new HashSet<AuthRequest>();
+        private int _authViewVersion;
+
+        private AuthRequest BeginAuthRequest()
+        {
+            var request = new AuthRequest { ViewVersion = _authViewVersion };
+            request.Loading = UIManager.Instance?.BeginLoading();
+            _authRequests.Add(request);
+            return request;
+        }
+
+        private void CompleteAuthRequest(AuthRequest request, Action continuation)
+        {
+            if (request.Completed) return;
+            request.Completed = true;
+            try
+            {
+                if (this != null && request.ViewVersion == _authViewVersion && IsVisible && isActiveAndEnabled)
+                    continuation?.Invoke();
+            }
+            finally { ReleaseAuthRequest(request); }
+        }
+
+        private void ReleaseAuthRequest(AuthRequest request)
+        {
+            request.Completed = true;
+            _authRequests.Remove(request);
+            LoadingHandle loading = request.Loading;
+            request.Loading = null;
+            loading?.Dispose();
+        }
+
+        private void InvalidateAuthRequests()
+        {
+            ++_authViewVersion;
+            foreach (AuthRequest request in new List<AuthRequest>(_authRequests)) ReleaseAuthRequest(request);
+        }
+
+        protected override void OnBeforeHide()
+        {
+            InvalidateAuthRequests();
+            base.OnBeforeHide();
+        }
+
+        protected override void OnDestroy()
+        {
+            InvalidateAuthRequests();
+            base.OnDestroy();
+        }
+
         protected override void Awake()
         {
             base.Awake();
@@ -102,8 +160,17 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             PlayerEconomyRepository.OnDataChanged += HandleEconomyDataChanged;
         }
 
-        private void OnDisable()
+        protected override void OnDisable()
         {
+            InvalidateAuthRequests();
+            if (btnClose != null) btnClose.onClick.RemoveListener(Hide);
+            if (btnSaveUsername != null) btnSaveUsername.onClick.RemoveListener(HandleSaveUsernamePressed);
+            if (btnAvatarChange != null) btnAvatarChange.onClick.RemoveListener(HandleAvatarChangePressed);
+            if (btnLoginFB != null) btnLoginFB.onClick.RemoveListener(HandleLoginFBPressed);
+            if (btnLoginGoogle != null) btnLoginGoogle.onClick.RemoveListener(HandleLoginGooglePressed);
+            if (btnLoginMail != null) btnLoginMail.onClick.RemoveListener(HandleLoginMailPressed);
+            if (btnLogout != null) btnLogout.onClick.RemoveListener(HandleLogoutPressed);
+            base.OnDisable();
             if (FirebaseAuthService.Instance != null)
             {
 #if FIREBASE_AUTH_ENABLED
@@ -124,15 +191,16 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
 
         protected override void OnBeforeShow()
         {
+            InvalidateAuthRequests();
             KillActiveTweens();
             ResetLayoutState();
-            
+
             RefreshAllProfileData();
             RefreshAuthStateUI();
             BindButtons();
         }
 
-        protected override void PlayShowAnimation()
+        protected override Tween CreateShowTween(CanvasGroup group, float duration)
         {
             _showSequence = DOTween.Sequence()
                 .SetUpdate(true)
@@ -151,8 +219,10 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                     animatedContent
                         .DOScale(Vector3.one, moveDuration)
                         .SetEase(showEase));
-                _showSequence.OnComplete(PlayIdleAnimation);
+                _showSequence.AppendCallback(PlayIdleAnimation);
             }
+            _showSequence.Insert(0f, group.DOFade(1f, ShowDuration));
+            return _showSequence;
         }
 
         private void PlayIdleAnimation()
@@ -165,7 +235,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                 .SetLink(gameObject, LinkBehaviour.KillOnDisable);
         }
 
-        protected override void PlayHideAnimation(Action onComplete)
+        protected override Tween CreateHideTween(CanvasGroup group, float duration)
         {
             KillActiveTweens();
 
@@ -185,8 +255,9 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                         .SetEase(hideEase));
             }
 
-            hideSeq.Join(canvasGroup.DOFade(0f, moveDuration * 0.8f).SetEase(Ease.InQuad));
-            hideSeq.OnComplete(() => onComplete?.Invoke());
+            hideSeq.Join(CanvasGroup.DOFade(0f, moveDuration * 0.8f).SetEase(Ease.InQuad));
+
+            return hideSeq;
         }
 
         // ──────────────────────────────────────────────────────────
@@ -195,14 +266,14 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
 
         private void BindButtons()
         {
-            BindButton(btnClose, Hide);
-            BindButton(btnSaveUsername, HandleSaveUsernamePressed);
-            BindButton(btnAvatarChange, HandleAvatarChangePressed);
+            if (btnClose != null) { btnClose.onClick.RemoveListener(Hide); btnClose.onClick.AddListener(Hide); }
+            if (btnSaveUsername != null) { btnSaveUsername.onClick.RemoveListener(HandleSaveUsernamePressed); btnSaveUsername.onClick.AddListener(HandleSaveUsernamePressed); }
+            if (btnAvatarChange != null) { btnAvatarChange.onClick.RemoveListener(HandleAvatarChangePressed); btnAvatarChange.onClick.AddListener(HandleAvatarChangePressed); }
 
-            BindButton(btnLoginFB, HandleLoginFBPressed);
-            BindButton(btnLoginGoogle, HandleLoginGooglePressed);
-            BindButton(btnLoginMail, HandleLoginMailPressed);
-            BindButton(btnLogout, HandleLogoutPressed);
+            if (btnLoginFB != null) { btnLoginFB.onClick.RemoveListener(HandleLoginFBPressed); btnLoginFB.onClick.AddListener(HandleLoginFBPressed); }
+            if (btnLoginGoogle != null) { btnLoginGoogle.onClick.RemoveListener(HandleLoginGooglePressed); btnLoginGoogle.onClick.AddListener(HandleLoginGooglePressed); }
+            if (btnLoginMail != null) { btnLoginMail.onClick.RemoveListener(HandleLoginMailPressed); btnLoginMail.onClick.AddListener(HandleLoginMailPressed); }
+            if (btnLogout != null) { btnLogout.onClick.RemoveListener(HandleLogoutPressed); btnLogout.onClick.AddListener(HandleLogoutPressed); }
         }
 
         private void HandleLoginMailPressed()
@@ -276,98 +347,113 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
 
         private void HandleLoginGooglePressed()
         {
-            UIManager.Instance.ShowLoading();
+            AuthRequest request = BeginAuthRequest();
+            try
+            {
 #if FIREBASE_AUTH_ENABLED
-            FirebaseAuthService.Instance.SignInWithGoogle(
-                _googleWebClientId,
-                user => {
-                    UIManager.Instance.HideLoading();
-                    UIManager.Instance.ShowToast("Đăng nhập Google thành công!");
-                    _isDevMockLoggedIn = false;
-                    RefreshAuthStateUI();
-                    RefreshAllProfileData();
-                },
-                err => {
-                    Debug.LogWarning($"[ProfilePopup] Real Google Login failed ({err}). Falling back to silent mock login.");
-                    UIManager.Instance.HideLoading();
-                    // Silent mock fallback
-                    UIManager.Instance.ShowToast("Đăng nhập Google thành công!");
-                    _isDevMockLoggedIn = true;
-                    _devMockEmail = "maz.dev@gmail.com";
-                    RefreshAuthStateUI();
-                    RefreshAllProfileData();
-                }
-            );
+                FirebaseAuthService.Instance.SignInWithGoogle(
+                    _googleWebClientId,
+                    user => CompleteAuthRequest(request, () => {
+
+                        UIManager.Instance.ShowToast("Đăng nhập Google thành công!");
+                        _isDevMockLoggedIn = false;
+                        RefreshAuthStateUI();
+                        RefreshAllProfileData();
+                    }),
+                    err => CompleteAuthRequest(request, () => {
+                        Debug.LogWarning($"[ProfilePopup] Real Google Login failed ({err}). Falling back to silent mock login.");
+
+                        // Silent mock fallback
+                        UIManager.Instance.ShowToast("Đăng nhập Google thành công!");
+                        _isDevMockLoggedIn = true;
+                        _devMockEmail = "maz.dev@gmail.com";
+                        RefreshAuthStateUI();
+                        RefreshAllProfileData();
+                    })
+                );
 #else
-            FirebaseAuthService.Instance.SignInWithGoogle(
-                _googleWebClientId,
-                uid => {
-                    UIManager.Instance.HideLoading();
-                    UIManager.Instance.ShowToast("Đăng nhập Google thành công!");
-                    _isDevMockLoggedIn = true;
-                    _devMockEmail = "maz.dev@gmail.com";
-                    RefreshAuthStateUI();
-                },
-                err => {
-                    UIManager.Instance.HideLoading();
-                }
-            );
+                FirebaseAuthService.Instance.SignInWithGoogle(
+                    _googleWebClientId,
+                    uid => CompleteAuthRequest(request, () => {
+
+                        UIManager.Instance.ShowToast("Đăng nhập Google thành công!");
+                        _isDevMockLoggedIn = true;
+                        _devMockEmail = "maz.dev@gmail.com";
+                        RefreshAuthStateUI();
+                    }),
+                    err => CompleteAuthRequest(request, null)
+                );
 #endif
+            }
+            catch
+            {
+                ReleaseAuthRequest(request);
+                throw;
+            }
         }
 
         private void HandleLoginFBPressed()
         {
-            UIManager.Instance.ShowLoading();
+            AuthRequest request = BeginAuthRequest();
+            try
+            {
 #if FIREBASE_AUTH_ENABLED
-            FirebaseAuthService.Instance.SignInWithFacebook(
-                user => {
-                    UIManager.Instance.HideLoading();
-                    UIManager.Instance.ShowToast("Đăng nhập Facebook thành công!");
-                    _isDevMockLoggedIn = false;
-                    RefreshAuthStateUI();
-                    RefreshAllProfileData();
-                },
-                err => {
-                    Debug.LogWarning($"[ProfilePopup] Real Facebook Login failed ({err}). Falling back to silent mock login.");
-                    UIManager.Instance.HideLoading();
-                    // Silent mock fallback
-                    UIManager.Instance.ShowToast("Đăng nhập Facebook thành công!");
-                    _isDevMockLoggedIn = true;
-                    _devMockEmail = "maz.player@facebook.com";
-                    RefreshAuthStateUI();
-                    RefreshAllProfileData();
-                }
-            );
+                FirebaseAuthService.Instance.SignInWithFacebook(
+                    user => CompleteAuthRequest(request, () => {
+
+                        UIManager.Instance.ShowToast("Đăng nhập Facebook thành công!");
+                        _isDevMockLoggedIn = false;
+                        RefreshAuthStateUI();
+                        RefreshAllProfileData();
+                    }),
+                    err => CompleteAuthRequest(request, () => {
+                        Debug.LogWarning($"[ProfilePopup] Real Facebook Login failed ({err}). Falling back to silent mock login.");
+
+                        // Silent mock fallback
+                        UIManager.Instance.ShowToast("Đăng nhập Facebook thành công!");
+                        _isDevMockLoggedIn = true;
+                        _devMockEmail = "maz.player@facebook.com";
+                        RefreshAuthStateUI();
+                        RefreshAllProfileData();
+                    })
+                );
 #else
-            FirebaseAuthService.Instance.SignInWithFacebook(
-                uid => {
-                    UIManager.Instance.HideLoading();
-                    UIManager.Instance.ShowToast("Đăng nhập Facebook thành công!");
-                    _isDevMockLoggedIn = true;
-                    _devMockEmail = "maz.player@facebook.com";
-                    RefreshAuthStateUI();
-                },
-                err => {
-                    UIManager.Instance.HideLoading();
-                }
-            );
+                FirebaseAuthService.Instance.SignInWithFacebook(
+                    uid => CompleteAuthRequest(request, () => {
+
+                        UIManager.Instance.ShowToast("Đăng nhập Facebook thành công!");
+                        _isDevMockLoggedIn = true;
+                        _devMockEmail = "maz.player@facebook.com";
+                        RefreshAuthStateUI();
+                    }),
+                    err => CompleteAuthRequest(request, null)
+                );
 #endif
+            }
+            catch
+            {
+                ReleaseAuthRequest(request);
+                throw;
+            }
         }
 
         private void HandleLogoutPressed()
         {
-            UIManager.Instance.ShowLoading();
-            _isDevMockLoggedIn = false;
-            _devMockEmail = "";
-            if (FirebaseAuthService.Instance != null)
+            AuthRequest request = BeginAuthRequest();
+            CompleteAuthRequest(request, () =>
             {
-                FirebaseAuthService.Instance.SignOut();
-                FirebaseAuthService.Instance.SignInAnonymously();
-            }
-            UIManager.Instance.HideLoading();
-            UIManager.Instance.ShowToast("Logged out successfully.");
-            RefreshAuthStateUI();
-            RefreshAllProfileData();
+                _isDevMockLoggedIn = false;
+                _devMockEmail = "";
+                if (FirebaseAuthService.Instance != null)
+                {
+                    FirebaseAuthService.Instance.SignOut();
+                    FirebaseAuthService.Instance.SignInAnonymously();
+                }
+
+                UIManager.Instance.ShowToast("Logged out successfully.");
+                RefreshAuthStateUI();
+                RefreshAllProfileData();
+            });
         }
 
         // ──────────────────────────────────────────────────────────
@@ -378,7 +464,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
         {
             // 1. Economy & Info
             PlayerEconomySaveData economyData = PlayerEconomyRepository.Instance.Data;
-            
+
             if (inputUsername != null)
                 inputUsername.text = economyData.username;
 
@@ -419,7 +505,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
 
             if (txtStars != null)
                 txtStars.text = totalStars.ToString("N0");
-            
+
             if (txtScore != null)
                 txtScore.text = totalScore.ToString("N0");
 
@@ -535,7 +621,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
         private void RefreshAuthStateUI()
         {
             bool isLoggedIn = FirebaseAuthService.Instance != null && FirebaseAuthService.Instance.IsLoggedIn;
-            
+
             // On Editor or Mobile, Google/Facebook/Email providers will be linked
             // We consider the user logged in if they are not anonymous
             bool hasRealAccount = _isDevMockLoggedIn;
@@ -604,6 +690,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
 #if FIREBASE_AUTH_ENABLED
         private void HandleAuthChanged(FirebaseUser user)
         {
+            if (!IsVisible || !isActiveAndEnabled) return;
             RefreshAuthStateUI();
             RefreshAllProfileData();
         }
@@ -611,24 +698,28 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
 
         private void HandleAuthLoggedOut()
         {
+            if (!IsVisible || !isActiveAndEnabled) return;
             RefreshAuthStateUI();
             RefreshAllProfileData();
         }
 
         private void HandleSaveSynced(string key)
         {
+            if (!IsVisible || !isActiveAndEnabled) return;
             // Reload UI when data syncs from Firebase cloud
             RefreshAllProfileData();
         }
 
         private void HandleEconomyDataChanged()
         {
+            if (!IsVisible || !isActiveAndEnabled) return;
             RefreshAllProfileData();
         }
 
 #if !FIREBASE_AUTH_ENABLED
         private void HandleAuthChangedMock(string uid)
         {
+            if (!IsVisible || !isActiveAndEnabled) return;
             RefreshAuthStateUI();
             RefreshAllProfileData();
         }

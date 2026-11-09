@@ -1,7 +1,8 @@
 using System;
+using System.Collections.Generic;
+using MazFramework.SceneManagement;
 using _PawSlidePopGame._Scripts.Services.Auth;
-using _PawSlidePopGame._Scripts.UI.Base;
-using _PawSlidePopGame._Scripts.UI.Manager;
+using MazFramework.UI;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -62,6 +63,63 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
 
         private Vector3 _statusLogOriginalLocalPos;
 
+        private sealed class AuthRequest
+        {
+            public int ViewVersion;
+            public LoadingHandle Loading;
+            public bool Completed;
+        }
+
+        private readonly HashSet<AuthRequest> _authRequests = new HashSet<AuthRequest>();
+        private int _authViewVersion;
+
+        private AuthRequest BeginAuthRequest()
+        {
+            var request = new AuthRequest { ViewVersion = _authViewVersion };
+            request.Loading = UIManager.Instance?.BeginLoading();
+            _authRequests.Add(request);
+            return request;
+        }
+
+        private void CompleteAuthRequest(AuthRequest request, Action continuation)
+        {
+            if (request.Completed) return;
+            request.Completed = true;
+            try
+            {
+                if (this != null && request.ViewVersion == _authViewVersion && IsVisible && isActiveAndEnabled)
+                    continuation?.Invoke();
+            }
+            finally { ReleaseAuthRequest(request); }
+        }
+
+        private void ReleaseAuthRequest(AuthRequest request)
+        {
+            request.Completed = true;
+            _authRequests.Remove(request);
+            LoadingHandle loading = request.Loading;
+            request.Loading = null;
+            loading?.Dispose();
+        }
+
+        private void InvalidateAuthRequests()
+        {
+            ++_authViewVersion;
+            foreach (AuthRequest request in new List<AuthRequest>(_authRequests)) ReleaseAuthRequest(request);
+        }
+
+        protected override void OnBeforeHide()
+        {
+            InvalidateAuthRequests();
+            base.OnBeforeHide();
+        }
+
+        protected override void OnDestroy()
+        {
+            InvalidateAuthRequests();
+            base.OnDestroy();
+        }
+
         protected override void Awake()
         {
             base.Awake();
@@ -73,6 +131,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
 
         protected override void OnBeforeShow()
         {
+            InvalidateAuthRequests();
             KillActiveTweens();
             ResetLayoutState();
 
@@ -133,6 +192,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             if (txtTitle != null) txtTitle.text = targetTitle;
             if (btnSubmitLogin != null) btnSubmitLogin.gameObject.SetActive(_currentMode == AuthPopupMode.Login);
             if (btnSubmitRegister != null) btnSubmitRegister.gameObject.SetActive(_currentMode == AuthPopupMode.Register);
+            BindButtons();
             if (txtToggleModeLabel != null) txtToggleModeLabel.text = targetToggleLabel;
 
             if (confirmParent != null)
@@ -244,7 +304,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             }
         }
 
-        protected override void PlayShowAnimation()
+        protected override Tween CreateShowTween(CanvasGroup group, float duration)
         {
             _showSequence = DOTween.Sequence()
                 .SetUpdate(true)
@@ -263,8 +323,10 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                     animatedContent
                         .DOScale(Vector3.one, moveDuration)
                         .SetEase(showEase));
-                _showSequence.OnComplete(PlayIdleAnimation);
+                _showSequence.AppendCallback(PlayIdleAnimation);
             }
+            _showSequence.Insert(0f, group.DOFade(1f, ShowDuration));
+            return _showSequence;
         }
 
         private void PlayIdleAnimation()
@@ -277,7 +339,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                 .SetLink(gameObject, LinkBehaviour.KillOnDisable);
         }
 
-        protected override void PlayHideAnimation(Action onComplete)
+        protected override Tween CreateHideTween(CanvasGroup group, float duration)
         {
             KillActiveTweens();
 
@@ -297,17 +359,18 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                         .SetEase(hideEase));
             }
 
-            hideSeq.Join(canvasGroup.DOFade(0f, moveDuration * 0.8f).SetEase(Ease.InQuad));
-            hideSeq.OnComplete(() => onComplete?.Invoke());
+            hideSeq.Join(CanvasGroup.DOFade(0f, moveDuration * 0.8f).SetEase(Ease.InQuad));
+
+            return hideSeq;
         }
 
         private void BindButtons()
         {
-            BindButton(btnClose, Hide);
-            BindButton(btnSubmitLogin, HandleSubmitLoginPressed);
-            BindButton(btnSubmitRegister, HandleSubmitRegisterPressed);
-            BindButton(btnToggleMode, ToggleMode);
-            BindButton(btnTogglePasswordVisibility, TogglePasswordVisibility);
+            if (btnClose != null) { btnClose.onClick.RemoveListener(Hide); btnClose.onClick.AddListener(Hide); }
+            if (btnSubmitLogin != null) { btnSubmitLogin.onClick.RemoveListener(HandleSubmitLoginPressed); btnSubmitLogin.onClick.AddListener(HandleSubmitLoginPressed); }
+            if (btnSubmitRegister != null) { btnSubmitRegister.onClick.RemoveListener(HandleSubmitRegisterPressed); btnSubmitRegister.onClick.AddListener(HandleSubmitRegisterPressed); }
+            if (btnToggleMode != null) { btnToggleMode.onClick.RemoveListener(ToggleMode); btnToggleMode.onClick.AddListener(ToggleMode); }
+            if (btnTogglePasswordVisibility != null) { btnTogglePasswordVisibility.onClick.RemoveListener(TogglePasswordVisibility); btnTogglePasswordVisibility.onClick.AddListener(TogglePasswordVisibility); }
         }
 
         private void ShowStatusLog(string message, bool isError = true)
@@ -331,7 +394,7 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                 animatedContent.DOKill();
                 animatedContent.localScale = Vector3.one;
                 animatedContent.localRotation = Quaternion.identity;
-                
+
                 animatedContent.DOShakePosition(0.5f, new Vector3(25f, 0f, 0f), 12, 90f, false, true)
                     .SetUpdate(true)
                     .SetLink(animatedContent.gameObject, LinkBehaviour.KillOnDisable)
@@ -372,38 +435,44 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                 return;
             }
 
-            UIManager.Instance.ShowLoading();
+            AuthRequest request = BeginAuthRequest();
+            try
+            {
 #if FIREBASE_AUTH_ENABLED
-            FirebaseAuthService.Instance.RegisterWithEmail(
-                email,
-                password,
-                user =>
-                {
-                    UIManager.Instance.HideLoading();
-                    UIManager.Instance.ShowToast("Account created successfully!");
-                    Hide();
-                },
-                err =>
-                {
-                    UIManager.Instance.HideLoading();
-                    ShowStatusLog($"Error: {err}");
-                }
-            );
+                FirebaseAuthService.Instance.RegisterWithEmail(
+                    email,
+                    password,
+                    user => CompleteAuthRequest(request, () => {
+
+                        UIManager.Instance.ShowToast("Account created successfully!");
+                        Hide();
+                    }),
+                    err => CompleteAuthRequest(request, () => {
+
+                        ShowStatusLog($"Error: {err}");
+                    })
+                );
 #else
-            FirebaseAuthService.Instance.RegisterWithEmail(
-                email,
-                password,
-                uid => {
-                    UIManager.Instance.HideLoading();
-                    UIManager.Instance.ShowToast("Account created successfully (Mock)!");
-                    Hide();
-                },
-                err => {
-                    UIManager.Instance.HideLoading();
-                    ShowStatusLog($"Error: {err}");
-                }
-            );
+                FirebaseAuthService.Instance.RegisterWithEmail(
+                    email,
+                    password,
+                    uid => CompleteAuthRequest(request, () => {
+
+                        UIManager.Instance.ShowToast("Account created successfully (Mock)!");
+                        Hide();
+                    }),
+                    err => CompleteAuthRequest(request, () => {
+
+                        ShowStatusLog($"Error: {err}");
+                    })
+                );
 #endif
+            }
+            catch
+            {
+                ReleaseAuthRequest(request);
+                throw;
+            }
         }
 
         private void HandleSubmitLoginPressed()
@@ -426,38 +495,44 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
                 return;
             }
 
-            UIManager.Instance.ShowLoading();
+            AuthRequest request = BeginAuthRequest();
+            try
+            {
 #if FIREBASE_AUTH_ENABLED
-            FirebaseAuthService.Instance.SignInWithEmail(
-                email,
-                password,
-                user =>
-                {
-                    UIManager.Instance.HideLoading();
-                    UIManager.Instance.ShowToast("Logged in successfully!");
-                    Hide();
-                },
-                err =>
-                {
-                    UIManager.Instance.HideLoading();
-                    ShowStatusLog($"Error: {err}");
-                }
-            );
+                FirebaseAuthService.Instance.SignInWithEmail(
+                    email,
+                    password,
+                    user => CompleteAuthRequest(request, () => {
+
+                        UIManager.Instance.ShowToast("Logged in successfully!");
+                        Hide();
+                    }),
+                    err => CompleteAuthRequest(request, () => {
+
+                        ShowStatusLog($"Error: {err}");
+                    })
+                );
 #else
-            FirebaseAuthService.Instance.SignInWithEmail(
-                email,
-                password,
-                uid => {
-                    UIManager.Instance.HideLoading();
-                    UIManager.Instance.ShowToast("Logged in successfully (Mock)!");
-                    Hide();
-                },
-                err => {
-                    UIManager.Instance.HideLoading();
-                    ShowStatusLog($"Error: {err}");
-                }
-            );
+                FirebaseAuthService.Instance.SignInWithEmail(
+                    email,
+                    password,
+                    uid => CompleteAuthRequest(request, () => {
+
+                        UIManager.Instance.ShowToast("Logged in successfully (Mock)!");
+                        Hide();
+                    }),
+                    err => CompleteAuthRequest(request, () => {
+
+                        ShowStatusLog($"Error: {err}");
+                    })
+                );
 #endif
+            }
+            catch
+            {
+                ReleaseAuthRequest(request);
+                throw;
+            }
         }
 
         private void ResetLayoutState()
@@ -475,6 +550,16 @@ namespace _PawSlidePopGame._Scripts.UI.Popups
             _confirmFieldTween?.Kill();
             animatedContent?.DOKill();
             transform.DOKill();
+        }
+        protected override void OnDisable()
+        {
+            InvalidateAuthRequests();
+            if (btnClose != null) btnClose.onClick.RemoveListener(Hide);
+            if (btnSubmitLogin != null) btnSubmitLogin.onClick.RemoveListener(HandleSubmitLoginPressed);
+            if (btnSubmitRegister != null) btnSubmitRegister.onClick.RemoveListener(HandleSubmitRegisterPressed);
+            if (btnToggleMode != null) btnToggleMode.onClick.RemoveListener(ToggleMode);
+            if (btnTogglePasswordVisibility != null) btnTogglePasswordVisibility.onClick.RemoveListener(TogglePasswordVisibility);
+            base.OnDisable();
         }
     }
 }

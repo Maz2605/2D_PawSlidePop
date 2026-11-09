@@ -1,11 +1,10 @@
-﻿using System;
 using System.Collections;
 using DG.Tweening;
 using UnityEngine;
 
-namespace _PawSlidePopGame._Scripts.UI.TopLevels
+namespace MazFramework.UI
 {
-    public class LoadingScreen : MonoBehaviour
+    public class LoadingScreen : BaseOverlay
     {
         [Header("UI References")] 
         [SerializeField] private CanvasGroup canvasGroup;
@@ -26,50 +25,22 @@ namespace _PawSlidePopGame._Scripts.UI.TopLevels
 
         private Coroutine _wavyRoutine;
         private float _showStartTime; // Thời điểm bắt đầu hiện xong
-        private bool _isHiding;
-
-        private void Awake()
+        protected override void OnBeforeShow()
         {
-            ResetToOpen();
-        }
-
-        public void ResetToOpen()
-        {
+            _showStartTime = Time.realtimeSinceStartup;
             StopWavyAnimation();
-            _isHiding = false;
-            
-            if (centerIcon != null) centerIcon.localScale = Vector3.zero;
+            if (centerIcon != null) { centerIcon.DOKill(); centerIcon.localScale = Vector3.zero; }
             foreach (var letter in letterRects)
-            {
                 if (letter != null) letter.localScale = Vector3.zero;
-            }
-
-            if (canvasGroup != null)
-            {
-                canvasGroup.alpha = 0f;
-                canvasGroup.blocksRaycasts = false;
-            }
-            gameObject.SetActive(false);
+            canvasGroup.alpha = 0f;
         }
 
-        public void ShowLoading(Action onCovered)
-        {
-            _isHiding = false;
-            gameObject.SetActive(true);
-            transform.SetAsLastSibling();
+        protected override Tween CreateShowTween() => canvasGroup.DOFade(1f, fadeDuration);
 
-            canvasGroup.DOKill();
-            canvasGroup.DOFade(1f, fadeDuration)
-                .SetUpdate(true)
-                .OnComplete(() =>
-                {
-                    canvasGroup.blocksRaycasts = true; 
-                    onCovered?.Invoke();
-                    
-                    // Đánh dấu thời điểm bắt đầu diễn animation chính
-                    _showStartTime = Time.realtimeSinceStartup; 
-                    StartDisplayElements();
-                });
+        protected override void OnShown()
+        {
+            _showStartTime = Time.realtimeSinceStartup;
+            StartDisplayElements();
         }
 
         private void StartDisplayElements()
@@ -95,32 +66,20 @@ namespace _PawSlidePopGame._Scripts.UI.TopLevels
             StartWavyAnimation();
         }
 
-        public void HideLoading()
+        protected override Tween CreateHideTween()
         {
-            if (_isHiding) return;
-            _isHiding = true;
-
-            // Tính toán xem đã diễn đủ thời gian chưa
-            float elapsed = Time.realtimeSinceStartup - _showStartTime;
-            float remainingTime = Mathf.Max(0, minShowTime - elapsed);
-
-            // Dùng DOVirtual để delay việc tắt nếu game load quá nhanh
-            DOVirtual.DelayedCall(remainingTime, PerformHide).SetUpdate(true);
+            float remainingTime = Mathf.Max(0f, minShowTime - (Time.realtimeSinceStartup - _showStartTime));
+            return DOTween.Sequence().AppendInterval(remainingTime)
+                .AppendCallback(StopWavyAnimation)
+                .Append(canvasGroup.DOFade(0f, fadeDuration));
         }
 
-        private void PerformHide()
+        protected override void OnDisable()
         {
+            base.OnDisable();
             StopWavyAnimation();
-            canvasGroup.DOKill();
-
-            canvasGroup.DOFade(0f, fadeDuration)
-                .SetUpdate(true)
-                .OnComplete(() =>
-                {
-                    ResetToOpen();
-                });
+            centerIcon?.DOKill();
         }
-
         #region Wavy Logic
         private void StartWavyAnimation()
         {

@@ -1,70 +1,71 @@
-﻿using System;
+using System;
 using System.Collections;
-using _PawSlidePopGame._Scripts.Core.System.DesignPattern.Singleton;
-using _PawSlidePopGame._Scripts.UI.Manager;
+using MazFramework.Foundation.Singleton;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-
-namespace _PawSlidePopGame._Scripts.Core.System.SceneManagement
+namespace MazFramework.SceneManagement
 {
-    public class SceneLoaderManager : Singleton<SceneLoaderManager>
+    public sealed class SceneLoaderManager : Singleton<SceneLoaderManager>
     {
-        [Header("Config")] [SerializeField] private float minLoadingTime = 1f;
-        [SerializeField] private float loadingCoverTimeout = 1f;
-
-        public void LoadScene(string sceneName, Action onSceneLoaded = null)
+        [SerializeField] private float minLoadingTime=1f;
+        [SerializeField] private float loadingCoverTimeout=1f;
+        public ILoadingOverlay LoadingOverlay { get; set; }
+        private LoadingHandle _loadingHandle;
+        private ILoadingOverlay ActiveOverlay
         {
-            StartCoroutine(LoadSceneRoutine(sceneName, onSceneLoaded));
+            get
+            {
+                if (LoadingOverlay is UnityEngine.Object owner && owner == null) return null;
+                if (LoadingOverlay is Behaviour behaviour && !behaviour.isActiveAndEnabled) return null;
+                return LoadingOverlay;
+            }
         }
-
-        private IEnumerator LoadSceneRoutine(string sceneName, Action onSceneLoaded)
+        public bool IsLoading { get; private set; }
+        public void LoadScene(string sceneName,Action onSceneLoaded=null)
         {
-            Time.timeScale = 1f;
-
-            bool isCovered = false;
-            bool hasLoadingOverlay = UIManager.Instance.ShowLoading(() => isCovered = true);
-
-            if (hasLoadingOverlay)
+            if(IsLoading) return;
+            if(string.IsNullOrWhiteSpace(sceneName) || !Application.CanStreamedLevelBeLoaded(sceneName))
             {
-                float coverDeadline = Time.unscaledTime + loadingCoverTimeout;
-                yield return new WaitUntil(() => isCovered || Time.unscaledTime >= coverDeadline);
+                Debug.LogError("[SceneLoader] Scene is not in the build: "+sceneName);
+                return;
             }
-            else
-            {
-                yield return null;
-            }
-
-
-            yield return Resources.UnloadUnusedAssets();
-            GC.Collect();
-
-            float startTime = Time.unscaledTime;
-
-            AsyncOperation op = SceneManager.LoadSceneAsync(sceneName);
-            op.allowSceneActivation = false;
-
-            while (op.progress < 0.9f)
-            {
-                yield return null;
-            }
-
-            float elapsedTime = Time.unscaledTime - startTime;
-
-            if (elapsedTime < minLoadingTime)
-            {
-                yield return new WaitForSecondsRealtime(minLoadingTime - elapsedTime);
-            }
-
-
-            op.allowSceneActivation = true;
-
-            while (!op.isDone) yield return null;
-
-            onSceneLoaded?.Invoke();
-
-            yield return null;
-
-            UIManager.Instance.HideLoading();
+            IsLoading=true;
+            StartCoroutine(LoadRoutine(sceneName,onSceneLoaded));
         }
+        private IEnumerator LoadRoutine(string sceneName,Action callback)
+        {
+            try
+            {
+                Time.timeScale=1f;
+                bool covered=false;
+                ILoadingOverlay overlay=ActiveOverlay;
+                LoadingHandle acquired=overlay?.BeginLoading(()=>covered=true);
+                if (!isActiveAndEnabled)
+                {
+                    acquired?.Dispose();
+                    yield break;
+                }
+                _loadingHandle=acquired;
+                float deadline=Time.unscaledTime+loadingCoverTimeout;
+                while(overlay!=null && !covered && Time.unscaledTime<deadline) yield return null;
+                float start=Time.unscaledTime;
+                AsyncOperation operation=SceneManager.LoadSceneAsync(sceneName);
+                if(operation==null) yield break;
+                operation.allowSceneActivation=false;
+                while(operation.progress<0.9f || Time.unscaledTime-start<minLoadingTime) yield return null;
+                operation.allowSceneActivation=true;
+                while(!operation.isDone) yield return null;
+                callback?.Invoke();
+            }
+            finally { IsLoading=false; ReleaseLoading(); }
+        }
+        private void ReleaseLoading()
+        {
+            LoadingHandle handle = _loadingHandle;
+            _loadingHandle = null;
+            handle?.Dispose();
+        }
+        private void OnDisable() { StopAllCoroutines(); IsLoading=false; ReleaseLoading(); }
+        protected override void OnDestroy() { ReleaseLoading(); base.OnDestroy(); }
     }
 }
