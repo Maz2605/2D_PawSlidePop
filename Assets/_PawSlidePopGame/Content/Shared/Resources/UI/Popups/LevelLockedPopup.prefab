@@ -1249,9 +1249,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 4495103546601822675}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8553662708a64142b290ff1031cd2f49, type: 3}
+  m_Script: {fileID: 11500000, guid: e6a03e4e98b94a60a124b639c49d7c15, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::_PawSlidePopGame._Scripts.Utils.UI.SafeAreaFitter
+  m_EditorClassIdentifier: 
 --- !u!1 &4539047758117375079
 GameObject:
   m_ObjectHideFlags: 0
@@ -1474,6 +1474,7 @@ GameObject:
   - component: {fileID: 2351769512792136406}
   - component: {fileID: 8972525754447014665}
   - component: {fileID: 6673107927122780936}
+  - component: {fileID: 800000000000000000}
   m_Layer: 5
   m_Name: LevelLockedPopup
   m_TagString: Untagged
@@ -1527,7 +1528,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::_PawSlidePopGame._Scripts.UI.Popups.LevelLockedPopup
   canvasGroup: {fileID: 8972525754447014665}
-  animDuration: 0.25
   animatedContent: {fileID: 0}
   lockTransform: {fileID: 347431782701148491}
   okButtonTransform: {fileID: 6792203958136162443}
@@ -1544,6 +1544,8 @@ MonoBehaviour:
   lockRotationDuration: 1.8
   buttonFloatDistance: 15
   buttonFloatDuration: 1.5
+  showDuration: 0.25
+  hideDuration: 0.25
 --- !u!1 &5553891856530111347
 GameObject:
   m_ObjectHideFlags: 0
@@ -2641,13 +2643,17 @@ MonoBehaviour:
   m_GameObject: {fileID: 9211979325365003125}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e962dde321c24987b2e63bd8aae3fa44, type: 3}
+  m_Script: {fileID: 11500000, guid: 772a544c54ac4bb98c021ad640dd9092, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::_PawSlidePopGame._Scripts.Data.Audio.UIButtonSound
-  soundType: 2
-  customClip: {fileID: 0}
+  m_EditorClassIdentifier: 
+  effectTarget: {fileID: 2254678534589137979}
+  animatePress: 0
+  punchScale: -0.1
+  punchDuration: .15
+  punchVibrato: 5
+  clickClip: {fileID: 8300000, guid: f9e969344ac7245b5b7fb98e947c19bb, type: 3}
   volumeScale: 1
-  playVibration: 1
+  playHaptics: 1
 --- !u!1001 &3401817243999112727
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2822,13 +2828,17 @@ MonoBehaviour:
   m_GameObject: {fileID: 1224774268435989430}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e962dde321c24987b2e63bd8aae3fa44, type: 3}
+  m_Script: {fileID: 11500000, guid: 772a544c54ac4bb98c021ad640dd9092, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::_PawSlidePopGame._Scripts.Data.Audio.UIButtonSound
-  soundType: 2
-  customClip: {fileID: 0}
+  m_EditorClassIdentifier: 
+  effectTarget: {fileID: 0}
+  animatePress: 1
+  punchScale: -0.1
+  punchDuration: .15
+  punchVibrato: 5
+  clickClip: {fileID: 8300000, guid: f9e969344ac7245b5b7fb98e947c19bb, type: 3}
   volumeScale: 1
-  playVibration: 1
+  playHaptics: 1
 --- !u!224 &3773508308965330189 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 1975847765141390106, guid: 61c9eebe836b4614a8eb77d1f6e6d79e, type: 3}
@@ -2957,35 +2967,39 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 800000000000000000, guid: 8778ec2c2c843fe41b7149f690859836, type: 3}
+      propertyPath: clickClip
+      value: 
+      objectReference: {fileID: 8300000, guid: 1eb392137d0521d43868e071cde9e1b4, type: 3}
+    - target: {fileID: 800000000000000000, guid: 8778ec2c2c843fe41b7149f690859836, type: 3}
+      propertyPath: volumeScale
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 800000000000000000, guid: 8778ec2c2c843fe41b7149f690859836, type: 3}
+      propertyPath: playHaptics
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 1998005464185876891, guid: 8778ec2c2c843fe41b7149f690859836, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 2542416169607669650}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 8778ec2c2c843fe41b7149f690859836, type: 3}
 --- !u!1 &3313754804736633184 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1998005464185876891, guid: 8778ec2c2c843fe41b7149f690859836, type: 3}
   m_PrefabInstance: {fileID: 3910959640267233531}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &2542416169607669650
+--- !u!114 &2542416169607669650 stripped
 MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
+  m_CorrespondingSourceObject: {fileID: 800000000000000000, guid: 8778ec2c2c843fe41b7149f690859836, type: 3}
+  m_PrefabInstance: {fileID: 3910959640267233531}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3313754804736633184}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e962dde321c24987b2e63bd8aae3fa44, type: 3}
+  m_Script: {fileID: 11500000, guid: 772a544c54ac4bb98c021ad640dd9092, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::_PawSlidePopGame._Scripts.Data.Audio.UIButtonSound
-  soundType: 1
-  customClip: {fileID: 0}
-  volumeScale: 1
-  playVibration: 1
+  m_EditorClassIdentifier: 
 --- !u!224 &5915302611682342848 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 7228811146730450747, guid: 8778ec2c2c843fe41b7149f690859836, type: 3}
@@ -3141,10 +3155,29 @@ MonoBehaviour:
   m_GameObject: {fileID: 8359261791788846965}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e962dde321c24987b2e63bd8aae3fa44, type: 3}
+  m_Script: {fileID: 11500000, guid: 772a544c54ac4bb98c021ad640dd9092, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::_PawSlidePopGame._Scripts.Data.Audio.UIButtonSound
-  soundType: 4
-  customClip: {fileID: 0}
+  m_EditorClassIdentifier: 
+  effectTarget: {fileID: 0}
+  animatePress: 1
+  punchScale: -0.1
+  punchDuration: .15
+  punchVibrato: 5
+  clickClip: {fileID: 8300000, guid: f9e969344ac7245b5b7fb98e947c19bb, type: 3}
   volumeScale: 1
-  playVibration: 1
+  playHaptics: 1
+--- !u!114 &800000000000000000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5317240487345591239}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a3d7a1ea8f14655a8449fc8d24866aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playOpenSound: 1
+  playOpenHaptics: 1
+  playCloseSound: 1

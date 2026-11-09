@@ -301,6 +301,7 @@ GameObject:
   - component: {fileID: 467827078709406662}
   - component: {fileID: 5796448750506234862}
   - component: {fileID: 745246447600433509}
+  - component: {fileID: 800000000000000000}
   m_Layer: 5
   m_Name: InventoryUiView
   m_TagString: Untagged
@@ -735,3 +736,23 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 9.7
+--- !u!114 &800000000000000000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5256318026069034809}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 772a544c54ac4bb98c021ad640dd9092, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  effectTarget: {fileID: 2293084475453498792}
+  animatePress: 1
+  punchScale: -0.1
+  punchDuration: .15
+  punchVibrato: 5
+  clickClip: {fileID: 8300000, guid: 1eb392137d0521d43868e071cde9e1b4, type: 3}
+  volumeScale: 1
+  playHaptics: 1

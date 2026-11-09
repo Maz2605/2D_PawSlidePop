@@ -1009,13 +1009,17 @@ MonoBehaviour:
   m_GameObject: {fileID: 1548602333733474787}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e962dde321c24987b2e63bd8aae3fa44, type: 3}
+  m_Script: {fileID: 11500000, guid: 772a544c54ac4bb98c021ad640dd9092, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::_PawSlidePopGame._Scripts.Data.Audio.UIButtonSound
-  soundType: 1
-  customClip: {fileID: 0}
+  m_EditorClassIdentifier: 
+  effectTarget: {fileID: 9160810622378459424}
+  animatePress: 1
+  punchScale: -0.1
+  punchDuration: .15
+  punchVibrato: 5
+  clickClip: {fileID: 8300000, guid: 1eb392137d0521d43868e071cde9e1b4, type: 3}
   volumeScale: 1
-  playVibration: 1
+  playHaptics: 1
 --- !u!1 &1549633994401241997
 GameObject:
   m_ObjectHideFlags: 0
@@ -1793,7 +1797,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::_PawSlidePopGame._Scripts.UI.Screens.StartScreen
   canvasGroup: {fileID: 5607556624408915595}
-  transitionDuration: 0.3
   playButton: {fileID: 1563522770637477778}
   settingsButton: {fileID: 7032246422792360516}
   headlineRect: {fileID: 5450382115908816562}
@@ -1803,6 +1806,8 @@ MonoBehaviour:
   birdRect: {fileID: 4054025750017023801}
   topLeftButtonsCG: {fileID: 1659389530129808182}
   topRightButtonsCG: {fileID: 3379177580090246644}
+  showDuration: 0.3
+  hideDuration: 0.3
 --- !u!1 &2785720358678359373
 GameObject:
   m_ObjectHideFlags: 0
@@ -3214,13 +3219,17 @@ MonoBehaviour:
   m_GameObject: {fileID: 5765898042131752012}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e962dde321c24987b2e63bd8aae3fa44, type: 3}
+  m_Script: {fileID: 11500000, guid: 772a544c54ac4bb98c021ad640dd9092, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::_PawSlidePopGame._Scripts.Data.Audio.UIButtonSound
-  soundType: 3
-  customClip: {fileID: 0}
+  m_EditorClassIdentifier: 
+  effectTarget: {fileID: 5582977364925396689}
+  animatePress: 1
+  punchScale: -0.1
+  punchDuration: .15
+  punchVibrato: 5
+  clickClip: {fileID: 8300000, guid: b04e3cbbfa36e4174a392906a504761f, type: 3}
   volumeScale: 1
-  playVibration: 1
+  playHaptics: 1
 --- !u!1 &5834053163976439389
 GameObject:
   m_ObjectHideFlags: 0

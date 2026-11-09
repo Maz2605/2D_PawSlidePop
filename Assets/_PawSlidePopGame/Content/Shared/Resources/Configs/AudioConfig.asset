@@ -51,3 +51,17 @@ MonoBehaviour:
     toastError: {fileID: 8300000, guid: 4eef04df83c0743a484eff6e6a81112f, type: 3}
     levelStart: {fileID: 8300000, guid: e299e89dfffa843e3a07594d48f2159b, type: 3}
     purchaseSuccess: {fileID: 8300000, guid: cb4af3f71ddbe4c4a9639a65691f710d, type: 3}
+  musicBackground: {fileID: 8300000, guid: d1d170de85b3f044a97961d38e8d348b, type: 3}
+  buttonClick: {fileID: 8300000, guid: 1eb392137d0521d43868e071cde9e1b4, type: 3}
+  backSound: {fileID: 8300000, guid: f9e969344ac7245b5b7fb98e947c19bb, type: 3}
+  popupOpen: {fileID: 8300000, guid: 0d4b74e639eda4b93a5a21be0ce2c4b5, type: 3}
+  popupClose: {fileID: 8300000, guid: f9e969344ac7245b5b7fb98e947c19bb, type: 3}
+  toggleOn: {fileID: 8300000, guid: 1eb392137d0521d43868e071cde9e1b4, type: 3}
+  toggleOff: {fileID: 8300000, guid: 1eb392137d0521d43868e071cde9e1b4, type: 3}
+  successSound: {fileID: 8300000, guid: cb4af3f71ddbe4c4a9639a65691f710d, type: 3}
+  warningSound: {fileID: 8300000, guid: 4eef04df83c0743a484eff6e6a81112f, type: 3}
+  errorSound: {fileID: 8300000, guid: 4eef04df83c0743a484eff6e6a81112f, type: 3}
+  notificationSound: {fileID: 8300000, guid: 0d4b74e639eda4b93a5a21be0ce2c4b5, type: 3}
+  matchSfxCooldown: 0.06
+  bigMatchScoreThreshold: 50
+  comboScoreThreshold: 90

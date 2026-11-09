@@ -311,6 +311,7 @@ GameObject:
   - component: {fileID: 1975847765141390106}
   - component: {fileID: 250332748535321477}
   - component: {fileID: 7988252247970780993}
+  - component: {fileID: 800000000000000000}
   m_Layer: 5
   m_Name: CircleButtons
   m_TagString: Untagged
@@ -475,3 +476,23 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &800000000000000000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4596745269298007457}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 772a544c54ac4bb98c021ad640dd9092, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  effectTarget: {fileID: 1975847765141390106}
+  animatePress: 1
+  punchScale: -0.1
+  punchDuration: .15
+  punchVibrato: 5
+  clickClip: {fileID: 8300000, guid: 1eb392137d0521d43868e071cde9e1b4, type: 3}
+  volumeScale: 1
+  playHaptics: 1

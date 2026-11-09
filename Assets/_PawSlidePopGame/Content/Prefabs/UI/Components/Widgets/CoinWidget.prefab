@@ -428,6 +428,7 @@ GameObject:
   - component: {fileID: 7150287496470604463}
   - component: {fileID: 1077437800585791446}
   - component: {fileID: 6868032455319970780}
+  - component: {fileID: 800000000000000000}
   m_Layer: 5
   m_Name: Button
   m_TagString: Untagged
@@ -748,3 +749,23 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &800000000000000000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6339582419182155308}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 772a544c54ac4bb98c021ad640dd9092, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  effectTarget: {fileID: 5622088523336270147}
+  animatePress: 1
+  punchScale: -0.1
+  punchDuration: .15
+  punchVibrato: 5
+  clickClip: {fileID: 8300000, guid: 1eb392137d0521d43868e071cde9e1b4, type: 3}
+  volumeScale: 1
+  playHaptics: 1

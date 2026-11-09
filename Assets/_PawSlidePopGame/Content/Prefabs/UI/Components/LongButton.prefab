@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 5851742267881547378}
   - component: {fileID: 4844136737717683159}
   - component: {fileID: 6166049556606766401}
+  - component: {fileID: 800000000000000000}
   m_Layer: 5
   m_Name: LongButton
   m_TagString: Untagged
@@ -334,3 +335,23 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &800000000000000000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1998005464185876891}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 772a544c54ac4bb98c021ad640dd9092, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  effectTarget: {fileID: 7228811146730450747}
+  animatePress: 1
+  punchScale: -0.1
+  punchDuration: .15
+  punchVibrato: 5
+  clickClip: {fileID: 8300000, guid: 1eb392137d0521d43868e071cde9e1b4, type: 3}
+  volumeScale: 1
+  playHaptics: 1
