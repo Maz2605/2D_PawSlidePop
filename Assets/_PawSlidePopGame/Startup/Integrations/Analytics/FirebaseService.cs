@@ -2,7 +2,7 @@ using _PawSlidePopGame._Scripts.Core.Boostrap;
 using _PawSlidePopGame._Scripts.Core.System.GameFlow;
 using _PawSlidePopGame._Scripts.Data.Events;
 using _PawSlidePopGame._Scripts.Data.Events.Payloads;
-using _PawSlidePopGame.Scripts.DesignPattern.ObserverPattern;
+using MazFramework.Foundation.Events;
 using Firebase;
 using Firebase.Analytics;
 using Firebase.Crashlytics;
@@ -71,7 +71,7 @@ namespace _PawSlidePopGame._Scripts.Services.Analytics
                 return;
             }
 
-            FirebaseAnalytics.LogEvent(eventName);
+            MazFramework.Integrations.Firebase.FirebaseRuntime.LogEvent(eventName);
         }
 
         public static void LogEvent(string eventName, params Parameter[] parameters)
@@ -81,7 +81,7 @@ namespace _PawSlidePopGame._Scripts.Services.Analytics
                 return;
             }
 
-            FirebaseAnalytics.LogEvent(eventName, parameters);
+            MazFramework.Integrations.Firebase.FirebaseRuntime.LogEvent(eventName, parameters);
         }
 
         public static void LogRewardGranted(string rewardType, int amount, string source)
@@ -113,36 +113,14 @@ namespace _PawSlidePopGame._Scripts.Services.Analytics
 
         private void CheckDependenciesAndInitialize()
         {
-            FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task =>
-            {
-                if (task.IsFaulted || task.IsCanceled)
+            MazFramework.Integrations.Firebase.FirebaseRuntime.Initialize(analyticsEnabled,crashlyticsEnabled,
+                () =>
                 {
-                    Debug.LogError($"[FirebaseService] Dependency check failed: {task.Exception}", this);
-                    return;
-                }
-
-                DependencyStatus status = task.Result;
-                if (status != DependencyStatus.Available)
-                {
-                    Debug.LogError($"[FirebaseService] Firebase dependencies are not available: {status}", this);
-                    return;
-                }
-
-                FirebaseApp app = FirebaseApp.DefaultInstance;
-                FirebaseAnalytics.SetAnalyticsCollectionEnabled(analyticsEnabled);
-                Crashlytics.IsCrashlyticsCollectionEnabled = crashlyticsEnabled;
-
-                IsReady = true;
-                OnReady?.Invoke();
-                SubscribeGameplayEvents();
-
-                if (logLifecycleEvents)
-                {
-                    LogEvent(EventAppBootstrap);
-                }
-
-                _ = app;
-            });
+                    if(this==null) return;
+                    IsReady=true; OnReady?.Invoke(); SubscribeGameplayEvents();
+                    if(logLifecycleEvents) LogEvent(EventAppBootstrap);
+                },
+                error => { if(this!=null) Debug.LogWarning("[FirebaseService] SDK unavailable; local play remains available: "+error,this); });
         }
 
         private void SubscribeGameplayEvents()

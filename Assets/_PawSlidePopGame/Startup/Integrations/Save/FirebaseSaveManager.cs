@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using _PawSlidePopGame._Scripts.Core.Boostrap;
-using _PawSlidePopGame._Scripts.Data.SaveSystem;
+using MazFramework.Persistence;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.EconomyManager;
 using _PawSlidePopGame._Scripts.Services.Auth;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.MapManager;
@@ -147,7 +147,7 @@ namespace _PawSlidePopGame._Scripts.Services.Save
         {
             try
             {
-                FirebaseFirestore db = FirebaseFirestore.DefaultInstance;
+                FirebaseFirestore db = MazFramework.Integrations.Firebase.FirebaseRuntime.Store;
                 WriteBatch batch = db.StartBatch();
                 bool hasUpdates = false;
 
@@ -201,7 +201,7 @@ namespace _PawSlidePopGame._Scripts.Services.Save
         {
             try
             {
-                FirebaseFirestore db = FirebaseFirestore.DefaultInstance;
+                FirebaseFirestore db = MazFramework.Integrations.Firebase.FirebaseRuntime.Store;
                 CollectionReference colRef = db.Collection("users").Document(userId).Collection("data");
 
                 // Check if account has switched

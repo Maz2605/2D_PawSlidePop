@@ -74,7 +74,7 @@ namespace _PawSlidePopGame._Scripts.Services.Auth
 #if FIREBASE_AUTH_ENABLED
             try
             {
-                _auth = FirebaseAuth.DefaultInstance;
+                _auth = MazFramework.Integrations.Firebase.FirebaseRuntime.Auth;
                 _auth.StateChanged += AuthStateChanged;
                 _cachedUser = _auth.CurrentUser;
                 IsInitialized = true;

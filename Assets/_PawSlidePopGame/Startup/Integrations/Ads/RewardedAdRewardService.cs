@@ -5,7 +5,7 @@ using _PawSlidePopGame._Scripts.Data.Events.Payloads;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.EconomyManager;
 using _PawSlidePopGame._Scripts.Gameplay.Meta.Inventory;
 using _PawSlidePopGame._Scripts.Services.Analytics;
-using _PawSlidePopGame.Scripts.DesignPattern.ObserverPattern;
+using MazFramework.Foundation.Events;
 using UnityEngine;
 
 namespace _PawSlidePopGame._Scripts.Services.Ads
