@@ -7,6 +7,7 @@ using _PawSlidePopGame._Scripts.Feature.Match3.Presentation;
 using _PawSlidePopGame._Scripts.Feature.Match3.View;
 using _PawSlidePopGame.Input;
 using UnityEngine;
+using MazFramework.UI;
 
 namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
 {
@@ -28,6 +29,27 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
         private bool _isTrackingDrag;
         private MoveAxis? _lockedAxis;
         private bool _isInputLocked;
+        private bool _uiInputBlocked;
+        public void SetUIInputBlocked(bool blocked)
+        {
+            if (_uiInputBlocked == blocked) return;
+            _uiInputBlocked = blocked;
+            if (blocked) ClearPreviewAndResetGesture();
+        }
+        private UIManager _uiManager;
+
+        private void BindUIManager()
+        {
+            if (_uiManager != null) _uiManager.GameplayInputBlockedChanged -= SetUIInputBlocked;
+            _uiManager = UIManager.ExistingInstance;
+            if (_uiManager != null) _uiManager.GameplayInputBlockedChanged += SetUIInputBlocked;
+            SetUIInputBlocked(_uiManager != null && _uiManager.IsGameplayInputBlocked);
+        }
+
+        private void LateUpdate()
+        {
+            if (_uiManager != UIManager.ExistingInstance) BindUIManager();
+        }
         private BoardInputMode _inputMode = BoardInputMode.Normal;
         private Coroutine _longPressCoroutine;
 
@@ -60,12 +82,17 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
 
         private void OnEnable()
         {
+            BindUIManager();
             SubscribeInputManager();
         }
 
         private void OnDisable()
         {
+            if (_uiManager != null) _uiManager.GameplayInputBlockedChanged -= SetUIInputBlocked;
+            _uiManager = null;
+            _uiInputBlocked = false;
             UnsubscribeInputManager();
+            ClearPreviewAndResetGesture();
         }
 
         private void SubscribeInputManager()
@@ -97,7 +124,7 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
 
         private void HandleTouchStart(Vector2 screenPosition)
         {
-            if (_isInputLocked || _boardView == null)
+            if (_isInputLocked || _uiInputBlocked || _boardView == null)
             {
                 return;
             }
@@ -121,7 +148,7 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
 
         private void HandleTouchMove(Vector2 screenPosition)
         {
-            if (_isInputLocked || !_isTrackingDrag || _pressedCell == null)
+            if (_isInputLocked || _uiInputBlocked || !_isTrackingDrag || _pressedCell == null)
             {
                 return;
             }
@@ -153,7 +180,7 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
         {
             StopLongPressDetection();
 
-            if (_isInputLocked || !_isTrackingDrag || _pressedCell == null)
+            if (_isInputLocked || _uiInputBlocked || !_isTrackingDrag || _pressedCell == null)
             {
                 ClearPreviewAndResetGesture();
                 return;
@@ -232,7 +259,7 @@ namespace _PawSlidePopGame._Scripts.Feature.Match3.Presenter
         private System.Collections.IEnumerator LongPressDelayRoutine()
         {
             yield return new WaitForSeconds(0.4f); // 0.4s holding triggers highlight
-            if (_pressedCell != null && _isTrackingDrag && !_lockedAxis.HasValue)
+            if (!_isInputLocked && !_uiInputBlocked && _pressedCell != null && _isTrackingDrag && !_lockedAxis.HasValue)
             {
                 OnLongPressStarted?.Invoke(_pressedCell);
             }
