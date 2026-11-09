@@ -60,7 +60,7 @@
         "*.asset": "yaml",
         "*.meta": "yaml",
         "*.prefab": "yaml",
-        "*.unity": "yaml",
+        "*.unity": "yaml"
     },
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.patterns": {
@@ -70,5 +70,6 @@
     "dotnet.defaultSolution": "2D_PawSlidePop.slnx",
     "dotrush.roslyn.projectOrSolutionFiles": [
         "f:\\Unity\\Maz's Project\\2D_PawSlidePop\\2D_PawSlidePop.sln"
-    ]
+    ],
+    "dotnet.preferCSharpExtension": true
 }
