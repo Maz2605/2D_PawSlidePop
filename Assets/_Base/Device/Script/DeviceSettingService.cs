@@ -1,57 +1,28 @@
-using _PawSlidePopGame._Scripts.Core.Boostrap;
+using MazFramework.Bootstrap;
 using DG.Tweening;
 using UnityEngine;
-
-namespace _PawSlidePopGame._Scripts.Core.System
+namespace MazFramework.Device
 {
-    public class DeviceSettingService : MonoBehaviour, IAppService
+    public sealed class DeviceSettingService : MonoBehaviour,IAppSystem
     {
-        [Header("Performance Settings")]
-        [SerializeField] private int targetFPS = 60;
-        [SerializeField] private bool disableVSync = true;
-
-        [Header("Screen Settings")]
-        [SerializeField] private bool keepScreenAwake = true;
-
-        private void Awake()
+        [SerializeField] private int targetFPS=60;
+        [SerializeField] private bool disableVSync=true;
+        [SerializeField] private bool keepScreenAwake=true;
+        [SerializeField] private int tweenerCapacity=2000;
+        [SerializeField] private int sequenceCapacity=500;
+        public bool IsInitialized { get; private set; }
+        public bool Initialize()
         {
-            DOTween.SetTweensCapacity(2000, 500);
-            Debug.Log("[DeviceSettingService] Awake: DOTween Capacity set to 2000/500");
-        }
-
-        public void Init()
-        {
-            if (disableVSync)
-            {
-                QualitySettings.vSyncCount = 0;
-            }
-            Application.targetFrameRate = targetFPS;
-
-            if (keepScreenAwake)
-            {
-                Screen.sleepTimeout = SleepTimeout.NeverSleep;
-            }
-            
-            InitDOTween();
+            if(IsInitialized) return true;
+            if(disableVSync) QualitySettings.vSyncCount=0;
             SetTargetFPS(targetFPS);
-
-            Debug.Log($"[DeviceSettingService] Initialized: Target FPS = {targetFPS}, VSync = {!disableVSync}");
+            if(keepScreenAwake) Screen.sleepTimeout=SleepTimeout.NeverSleep;
+            DOTween.SetTweensCapacity(Mathf.Max(1,tweenerCapacity),Mathf.Max(1,sequenceCapacity));
+            DOTween.logBehaviour=LogBehaviour.ErrorsOnly;
+            DOTween.defaultAutoKill=true;
+            DOTween.defaultRecyclable=false;
+            IsInitialized=true; return true;
         }
-        
-        public void SetTargetFPS(int fps)
-        {
-            Application.targetFrameRate = fps;
-            Debug.Log($"[DeviceSettingService] Changed FPS to {fps}");
-        }
-        
-        private void InitDOTween()
-        {
-            DOTween.SetTweensCapacity(2000, 500);
-            DOTween.logBehaviour = LogBehaviour.ErrorsOnly; 
-            DOTween.defaultAutoKill = true; 
-            DOTween.defaultRecyclable = false; 
-            
-            Debug.Log($"[DeviceSettingService] DOTween Initialized. Capacity: 2000/500");
-        }
+        public void SetTargetFPS(int fps) { targetFPS=Mathf.Max(1,fps); Application.targetFrameRate=targetFPS; }
     }
 }
