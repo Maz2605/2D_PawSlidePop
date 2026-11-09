@@ -1,4 +1,4 @@
-﻿namespace _PawSlidePopGame.Scripts.DesignPattern.ObjectPooling
+namespace MazFramework.Foundation.Pooling
 {
     public interface IPoolable
     {

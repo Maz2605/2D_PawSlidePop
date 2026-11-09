@@ -1,6 +1,6 @@
-﻿using UnityEngine;
+using UnityEngine;
 
-namespace _PawSlidePopGame._Scripts.Core.DesignPattern.Factory
+namespace MazFramework.Foundation.Factory
 {
     public interface IFactory<TData, TVisual> where TVisual : MonoBehaviour
     {
